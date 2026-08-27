@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
 
 function getAuthHeaders() {
@@ -18,15 +20,27 @@ export async function request(endpoint, options = {}) {
     }
   };
 
-  const res = await fetch(url, config);
-  const data = await res.json().catch(() => ({}));
+  try {
+    console.log(`[API Request] ${config.method || 'GET'} ${url}`);
+    const res = await fetch(url, config);
+    const data = await res.json().catch(() => ({}));
 
-  if (!res.ok) {
-    throw new Error(data.error || 'An error occurred while connecting to server');
+    if (!res.ok) {
+      throw new Error(data.error || 'An error occurred while connecting to server');
+    }
+
+    return data;
+  } catch (err) {
+    console.error(`[API Error] Request to ${url} failed:`, err);
+    if (err.name === 'TypeError' && err.message === 'Failed to fetch') {
+      throw new Error(`Unable to connect to backend server at ${url}. Please check your internet connection.`);
+    }
+    throw err;
   }
-
-  return data;
 }
+
+
+
 
 // AUTH API
 export const authAPI = {

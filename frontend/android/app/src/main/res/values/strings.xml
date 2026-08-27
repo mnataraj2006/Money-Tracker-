@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">money-tracker</string>
+    <string name="title_activity_main">money-tracker</string>
+    <string name="package_name">com.moneytracker.app</string>
+    <string name="custom_url_scheme">com.moneytracker.app</string>
+    <string name="server_client_id">760935628306-adaehnvi7ktav0u2hsq0kr0mt4fheife.apps.googleusercontent.com</string>
+</resources>
+

@@ -39,7 +39,8 @@ app.get('/api/health', (req, res) => {
 
 // Connect DB & Start Server
 connectDB(MONGODB_URI).then(() => {
-  app.listen(PORT, () => {
-    console.log(`Money Tracker Backend API connected to MongoDB Atlas on port ${PORT}`);
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Money Tracker Backend API connected to MongoDB Atlas on port ${PORT} (0.0.0.0)`);
   });
 });
+

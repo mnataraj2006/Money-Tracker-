@@ -98,11 +98,18 @@ router.post('/google', async (req, res) => {
     if (credential) {
       // Verify Google ID Token using OAuth2Client
       try {
-        const googleClientId = process.env.GOOGLE_CLIENT_ID || '108293740294-moneytracker.apps.googleusercontent.com';
+        const googleClientId = process.env.GOOGLE_CLIENT_ID || '760935628306-adaehnvi7ktav0u2hsq0kr0mt4fheife.apps.googleusercontent.com';
+        const allowedAudiences = [
+          googleClientId,
+          process.env.ANDROID_GOOGLE_CLIENT_ID,
+          '760935628306-adaehnvi7ktav0u2hsq0kr0mt4fheife.apps.googleusercontent.com'
+        ].filter(Boolean);
+
         const ticket = await googleClient.verifyIdToken({
           idToken: credential,
-          audience: googleClientId
+          audience: allowedAudiences
         });
+
         const payload = ticket.getPayload();
         googleSub = payload.sub;
         if (!email) email = payload.email ? payload.email.trim().toLowerCase() : '';

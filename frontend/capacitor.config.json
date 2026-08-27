@@ -1,0 +1,16 @@
+{
+  "appId": "com.moneytracker.app",
+  "appName": "money-tracker",
+  "webDir": "dist",
+  "plugins": {
+    "GoogleAuth": {
+      "scopes": [
+        "profile",
+        "email"
+      ],
+      "serverClientId": "760935628306-adaehnvi7ktav0u2hsq0kr0mt4fheife.apps.googleusercontent.com",
+      "forceCodeForRefreshToken": true
+    }
+  }
+}
+
