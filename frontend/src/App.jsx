@@ -83,6 +83,10 @@ function AppContent() {
     checkAutomatedWeeklyBackup();
   };
 
+  const handleUpdateUser = (updatedFields) => {
+    setUser((prev) => (prev ? { ...prev, ...updatedFields } : prev));
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('money_tracker_token');
     setUser(null);
@@ -127,7 +131,7 @@ function AppContent() {
           {currentScreen === 'transactions' && <TransactionsScreen user={user} onNavigate={navigateTo} />}
           {currentScreen === 'cash' && <CashAtHomeScreen user={user} onNavigate={navigateTo} />}
           {currentScreen === 'history' && <HistoryScreen user={user} onNavigate={navigateTo} />}
-          {currentScreen === 'settings' && <SettingsScreen user={user} onLogout={handleLogout} />}
+          {currentScreen === 'settings' && <SettingsScreen user={user} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />}
         </AppShell>
       ) : (
         <>

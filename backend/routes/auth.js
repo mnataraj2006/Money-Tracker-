@@ -224,4 +224,31 @@ router.post('/change-password', authenticateToken, async (req, res) => {
   }
 });
 
+// UPDATE PROFILE
+router.put('/profile', authenticateToken, async (req, res) => {
+  const { fullName } = req.body;
+
+  if (!fullName || !fullName.trim()) {
+    return res.status(400).json({ error: 'Full name is required' });
+  }
+
+  try {
+    const user = await User.findOne({ id: req.user.userId });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    user.fullName = fullName.trim();
+    await user.save();
+
+    return res.json({
+      message: 'Profile updated successfully',
+      user: { id: user.id, fullName: user.fullName, email: user.email }
+    });
+  } catch (err) {
+    console.error('Update profile error:', err);
+    return res.status(500).json({ error: 'Failed to update profile' });
+  }
+});
+
 module.exports = router;

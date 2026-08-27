@@ -38,7 +38,9 @@ export const authAPI = {
     request('/auth/google', { method: 'POST', body: JSON.stringify(googleData) }),
   getMe: () => request('/auth/me'),
   changePassword: (oldPassword, newPassword) =>
-    request('/auth/change-password', { method: 'POST', body: JSON.stringify({ oldPassword, newPassword }) })
+    request('/auth/change-password', { method: 'POST', body: JSON.stringify({ oldPassword, newPassword }) }),
+  updateProfile: (fullName) =>
+    request('/auth/profile', { method: 'PUT', body: JSON.stringify({ fullName }) })
 };
 
 // TRANSACTIONS API

@@ -1,23 +1,63 @@
-import React, { useState } from 'react';
-import { Bell, User, Lock, LogOut, RefreshCw, Grid, Moon, Database, ChevronRight, Globe, Check, Download, Upload } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Bell, User, Lock, LogOut, RefreshCw, Grid, Moon, Database, ChevronRight, Globe, Check, Download, Upload, Edit2 } from 'lucide-react';
 import { authAPI, settingsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
-
 import PageContainer from '../components/PageContainer';
 
-export default function SettingsScreen({ user, onLogout }) {
+export default function SettingsScreen({ user, onLogout, onUpdateUser }) {
   const { language, setLanguage, t } = useLanguage();
   const [currency, setCurrency] = useState('INR (₹)');
   const [notifications, setNotifications] = useState(true);
+
+  // Modals
+  const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  // Profile Edit State
+  const [editName, setEditName] = useState(user?.fullName || '');
+  const [profileMsg, setProfileMsg] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
+
+  // Password Edit State
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
 
+  // Backup State
   const [backupStatus, setBackupStatus] = useState('');
   const [backupLoading, setBackupLoading] = useState(false);
+
+  useEffect(() => {
+    if (user?.fullName) {
+      setEditName(user.fullName);
+    }
+  }, [user]);
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    if (!editName.trim()) return;
+
+    try {
+      setProfileLoading(true);
+      setProfileMsg('');
+      const res = await authAPI.updateProfile(editName.trim());
+      setProfileMsg(t('profileUpdatedSuccess') || 'Profile updated successfully!');
+      if (onUpdateUser) {
+        onUpdateUser({ fullName: editName.trim() });
+      }
+      setTimeout(() => {
+        setShowProfileModal(false);
+        setProfileMsg('');
+      }, 1200);
+    } catch (err) {
+      console.error('Failed to update profile name:', err);
+      setProfileMsg(err.message || 'Failed to update profile name');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
 
   const handleExportBackup = async () => {
     try {
@@ -95,12 +135,20 @@ export default function SettingsScreen({ user, onLogout }) {
           | {t('account')}
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
+        {/* Interactive Profile Option */}
+        <div
+          onClick={() => {
+            setEditName(user?.fullName || '');
+            setProfileMsg('');
+            setShowProfileModal(true);
+          }}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-main)', fontWeight: '600' }}>
-            <User size={18} color="var(--text-secondary)" /> {t('profile')}
+            <User size={18} color="var(--navy-primary)" /> {t('profile')}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--text-secondary)' }}>
-            {user?.fullName} <ChevronRight size={16} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--navy-primary)', fontWeight: '700' }}>
+            {user?.fullName} <Edit2 size={15} />
           </div>
         </div>
 
@@ -209,6 +257,76 @@ export default function SettingsScreen({ user, onLogout }) {
         </div>
       </div>
 
+      {/* Edit Profile Name Modal */}
+      {showProfileModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }}>
+          <div className="stitch-card" style={{ width: '100%', maxWidth: '360px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--navy-primary)' }}>
+              {t('editProfile') || 'Edit Profile Name'}
+            </h3>
+
+            <form onSubmit={handleSaveProfile} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)' }}>
+                  {t('fullName') || 'Full Name'}
+                </label>
+                <input
+                  type="text"
+                  className="input-control"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder={t('enterFullName') || 'Enter full name'}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              {profileMsg && (
+                <div style={{
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  color: profileMsg.includes('successfully') || profileMsg.includes('வெற்றிகரமாக') ? 'var(--green-income)' : 'var(--red-expense)',
+                  textAlign: 'center'
+                }}>
+                  {profileMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  className="btn-outline-navy"
+                  style={{ flex: 1 }}
+                  onClick={() => setShowProfileModal(false)}
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  className="btn-primary-navy"
+                  style={{ flex: 1 }}
+                  disabled={profileLoading || !editName.trim()}
+                >
+                  {profileLoading ? 'Saving...' : (t('saveChanges') || 'Save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* Language Selection Modal */}
       {showLanguageModal && (
         <div style={{
@@ -218,7 +336,7 @@ export default function SettingsScreen({ user, onLogout }) {
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(15, 23, 42, 0.6)',
-          zIndex: 100,
+          zIndex: 1000,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -234,7 +352,7 @@ export default function SettingsScreen({ user, onLogout }) {
                 onClick={() => handleSelectLanguage('en')}
                 style={{
                   display: 'flex',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '12px 16px',
                   borderRadius: '10px',
@@ -254,7 +372,7 @@ export default function SettingsScreen({ user, onLogout }) {
                 onClick={() => handleSelectLanguage('ta')}
                 style={{
                   display: 'flex',
-                  justify: 'space-between',
+                  justifyContent: 'space-between',
                   alignItems: 'center',
                   padding: '12px 16px',
                   borderRadius: '10px',
@@ -289,7 +407,7 @@ export default function SettingsScreen({ user, onLogout }) {
           right: 0,
           bottom: 0,
           backgroundColor: 'rgba(15, 23, 42, 0.65)',
-          zIndex: 999,
+          zIndex: 1000,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

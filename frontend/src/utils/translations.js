@@ -11,6 +11,11 @@ export const translations = {
     // Settings Screen
     account: 'Account',
     profile: 'Profile',
+    editProfile: 'Edit Profile',
+    fullName: 'Full Name',
+    enterFullName: 'Enter your full name',
+    saveChanges: 'Save Changes',
+    profileUpdatedSuccess: 'Profile updated successfully!',
     changePassword: 'Change Password',
     logout: 'Logout',
     money: 'Money',
@@ -112,6 +117,11 @@ export const translations = {
     // Settings Screen
     account: 'கணக்கு',
     profile: 'சுயவிவரம்',
+    editProfile: 'சுயவிவரத்தைத் திருத்தவும்',
+    fullName: 'முழு பெயர்',
+    enterFullName: 'உங்கள் முழு பெயரை உள்ளிடவும்',
+    saveChanges: 'மாற்றங்களைச் சேமிக்கவும்',
+    profileUpdatedSuccess: 'சுயவிவரம் வெற்றிகரமாக மாற்றப்பட்டது!',
     changePassword: 'கடவுச்சொல்லை மாற்றவும்',
     logout: 'வெளியேறு',
     money: 'பணம்',
