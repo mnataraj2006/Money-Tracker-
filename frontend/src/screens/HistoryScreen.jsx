@@ -38,10 +38,12 @@ export default function HistoryScreen({ user, onNavigate }) {
   };
 
   const [currentMonth, setCurrentMonth] = useState(getCurrentMonthStr);
-  const [history, setHistory] = useState(cache.history?.history || []);
-  const [monthlySummary, setMonthlySummary] = useState(cache.history?.monthlySummary || null);
-  const [cashData, setCashData] = useState(cache.history?.cashData || null);
-  const [loading, setLoading] = useState(!cache.history);
+  
+  const monthCache = cache.historyByMonth?.[currentMonth];
+  const [history, setHistory] = useState(monthCache?.history || []);
+  const [monthlySummary, setMonthlySummary] = useState(monthCache?.monthlySummary || null);
+  const [cashData, setCashData] = useState(monthCache?.cashData || null);
+  const [loading, setLoading] = useState(!monthCache);
   const [error, setError] = useState(null);
 
   // Selected Day Detail State
@@ -53,12 +55,20 @@ export default function HistoryScreen({ user, onNavigate }) {
   const [filterPayment, setFilterPayment] = useState('ALL'); // ALL, CASH, UPI, BANK, CARD
 
   useEffect(() => {
+    const cached = cache.historyByMonth?.[currentMonth];
+    if (cached) {
+      setHistory(cached.history || []);
+      setMonthlySummary(cached.monthlySummary || null);
+      setCashData(cached.cashData || null);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     loadHistoryAndSummary();
   }, [currentMonth]);
 
   const loadHistoryAndSummary = async () => {
     try {
-      if (!cache.history) setLoading(true);
       setError(null);
       const [histRes, sumRes, cashRes] = await Promise.all([
         summaryAPI.getHistory(currentMonth),
@@ -68,11 +78,16 @@ export default function HistoryScreen({ user, onNavigate }) {
       setHistory(histRes.history || []);
       setMonthlySummary(sumRes);
       setCashData(cashRes);
-      updateCache('history', {
-        history: histRes.history || [],
-        monthlySummary: sumRes,
-        cashData: cashRes
-      });
+
+      const historyByMonth = {
+        ...(cache.historyByMonth || {}),
+        [currentMonth]: {
+          history: histRes.history || [],
+          monthlySummary: sumRes,
+          cashData: cashRes
+        }
+      };
+      updateCache('historyByMonth', historyByMonth);
     } catch (err) {
       console.error('Failed to load month-wise history:', err);
       setError(t('unableToLoadHistory'));

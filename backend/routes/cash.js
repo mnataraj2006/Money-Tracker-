@@ -40,9 +40,17 @@ async function autoClosePastDays(userId) {
     const todayStr = new Date().toISOString().split('T')[0];
     const txDates = await Transaction.distinct('date', { userId, date: { $lt: todayStr } });
     const countDates = await CashCount.distinct('date', { userId, date: { $lt: todayStr } });
-    const pastDates = Array.from(new Set([...txDates, ...countDates])).sort();
+    const allPastDates = Array.from(new Set([...txDates, ...countDates])).sort();
+    
+    if (allPastDates.length === 0) return;
 
-    for (let d of pastDates) {
+    const existingClosed = await DailyClosing.distinct('date', { userId, date: { $lt: todayStr }, isClosed: true });
+    const closedSet = new Set(existingClosed);
+    const unclosedDates = allPastDates.filter(d => !closedSet.has(d));
+
+    if (unclosedDates.length === 0) return;
+
+    for (let d of unclosedDates) {
       let closing = await DailyClosing.findOne({ userId, date: d });
       if (!closing) {
         const openingCash = await getPreviousClosingCash(userId, d);

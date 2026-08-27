@@ -87,16 +87,34 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
 });
 
 // DAILY HISTORY LIST
+// DAILY HISTORY LIST - OPTIMIZED
 router.get('/history', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
   const month = req.query.month || new Date().toISOString().substring(0, 7);
 
   try {
     await autoClosePastDays(userId);
+
+    const monthPrefix = `${month}-`;
     const monthRegex = new RegExp(`^${month}`);
-    const monthTxs = await Transaction.find({ userId, date: monthRegex }).sort({ date: -1, createdAt: -1 });
-    const closingRows = await DailyClosing.find({ userId, date: monthRegex });
-    const countRows = await CashCount.find({ userId, date: monthRegex }).sort({ createdAt: -1 });
+
+    // Parallel MongoDB queries with lean() for maximum performance
+    const [monthTxs, closingRows, countRows, prevClosingDoc] = await Promise.all([
+      Transaction.find({ userId, date: monthRegex }).sort({ date: -1, createdAt: -1 }).lean(),
+      DailyClosing.find({ userId, date: monthRegex }).lean(),
+      CashCount.find({ userId, date: monthRegex }).sort({ createdAt: -1 }).lean(),
+      DailyClosing.findOne({ userId, date: { $lt: monthPrefix }, isClosed: true }).sort({ date: -1 }).lean()
+    ]);
+
+    let defaultOpeningCash = 0;
+    if (prevClosingDoc) {
+      defaultOpeningCash = prevClosingDoc.physicalCash !== undefined && prevClosingDoc.physicalCash !== null
+        ? prevClosingDoc.physicalCash
+        : prevClosingDoc.expectedClosingCash;
+    } else {
+      const prevCountDoc = await CashCount.findOne({ userId, date: { $lt: monthPrefix } }).sort({ date: -1, createdAt: -1 }).lean();
+      if (prevCountDoc) defaultOpeningCash = prevCountDoc.physicalCash;
+    }
 
     const datesMap = {};
 
@@ -188,11 +206,15 @@ router.get('/history', authenticateToken, async (req, res) => {
       }
     });
 
-    for (let d of Object.keys(datesMap)) {
+    // Fast in-memory calculation (0 DB roundtrips)
+    const sortedDates = Object.keys(datesMap).sort();
+    let currentOpening = defaultOpeningCash;
+
+    for (let d of sortedDates) {
       const item = datesMap[d];
       item.net = item.income - item.expense;
       if (!item.openingCash) {
-        item.openingCash = await getPreviousClosingCash(userId, item.date);
+        item.openingCash = currentOpening;
       }
       if (!item.expectedCash) {
         item.expectedCash = item.openingCash + item.cashIncome - item.cashExpense;
@@ -204,6 +226,8 @@ router.get('/history', authenticateToken, async (req, res) => {
       if (item.difference === 0) item.status = 'TALLIED';
       else if (item.difference < 0) item.status = 'SHORT';
       else if (item.difference > 0) item.status = 'EXTRA';
+
+      currentOpening = item.physicalCash;
     }
 
     const dailyHistory = Object.values(datesMap).sort((a, b) => b.date.localeCompare(a.date));
