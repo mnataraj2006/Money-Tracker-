@@ -3,6 +3,8 @@ import { Bell, User, Lock, LogOut, RefreshCw, Grid, Moon, Database, ChevronRight
 import { authAPI, settingsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 
+import PageContainer from '../components/PageContainer';
+
 export default function SettingsScreen({ user, onLogout }) {
   const { language, setLanguage, t } = useLanguage();
   const [currency, setCurrency] = useState('INR (₹)');
@@ -82,21 +84,8 @@ export default function SettingsScreen({ user, onLogout }) {
   };
 
   return (
-    <div className="screen-container">
-      {/* Header */}
-      <div className="app-header">
-        <div className="app-header-left">
-          <div className="app-avatar-circle">
-            {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'S'}
-          </div>
-          <span className="app-title-text">{t('appTitle')}</span>
-        </div>
-        <div className="app-header-icon">
-          <Bell size={18} />
-        </div>
-      </div>
-
-      <h1 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--navy-primary)' }}>
+    <PageContainer>
+      <h1 className="page-title">
         {t('settings')}
       </h1>
 
@@ -330,6 +319,6 @@ export default function SettingsScreen({ user, onLogout }) {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

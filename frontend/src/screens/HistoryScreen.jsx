@@ -24,6 +24,8 @@ import { summaryAPI, cashAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useDataCache } from '../context/DataContext';
 
+import PageContainer from '../components/PageContainer';
+
 export default function HistoryScreen({ user, onNavigate }) {
   const { t, language } = useLanguage();
   const { cache, updateCache } = useDataCache();
@@ -389,41 +391,22 @@ export default function HistoryScreen({ user, onNavigate }) {
   // MAIN HISTORY SCREEN VIEW
   // ----------------------------------------------------
   return (
-    <div className="screen-container">
-      {/* 3. Top Header */}
-      <div className="app-header">
-        <div className="app-header-left">
-          <div
-            className="app-avatar-circle"
-            onClick={() => onNavigate('settings')}
-            style={{ cursor: 'pointer' }}
-          >
-            {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'M'}
-          </div>
-          <span className="app-title-text">{t('appTitle')}</span>
-        </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div
-            className="app-header-icon"
-            onClick={() => setShowFilterModal(true)}
-            style={{ cursor: 'pointer', position: 'relative' }}
-          >
-            <Filter size={18} />
-            {(filterType !== 'ALL' || filterPayment !== 'ALL') && (
-              <span style={{ position: 'absolute', top: '2px', right: '2px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--navy-primary)' }} />
-            )}
-          </div>
-          <div className="app-header-icon">
-            <Bell size={18} />
-          </div>
-        </div>
-      </div>
-
+    <PageContainer>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--navy-primary)' }}>
+        <h1 className="page-title">
           {t('history')}
         </h1>
+        <div
+          className="app-header-icon"
+          onClick={() => setShowFilterModal(true)}
+          style={{ cursor: 'pointer', position: 'relative' }}
+        >
+          <Filter size={18} />
+          {(filterType !== 'ALL' || filterPayment !== 'ALL') && (
+            <span style={{ position: 'absolute', top: '2px', right: '2px', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: 'var(--navy-primary)' }} />
+          )}
+        </div>
+      </div>
 
         <button
           onClick={() => onNavigate('monthly-summary', { month: currentMonth })}
@@ -441,7 +424,6 @@ export default function HistoryScreen({ user, onNavigate }) {
         >
           {t('viewMonthlyReport')} <ChevronRight size={14} />
         </button>
-      </div>
 
       {/* 4. Month Selector */}
       <div className="stitch-card" style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -759,6 +741,6 @@ export default function HistoryScreen({ user, onNavigate }) {
           </div>
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './styles/tokens.css';
-import BottomNav from './components/BottomNav';
-
+import AppShell from './components/AppShell';
 import LoginScreen from './screens/LoginScreen';
 import HomeScreen from './screens/HomeScreen';
 import AddIncomeScreen from './screens/AddIncomeScreen';
@@ -111,20 +110,27 @@ function AppContent() {
     );
   }
 
-  const showBottomNav = user && ['home', 'transactions', 'cash', 'history', 'settings'].includes(currentScreen);
+  const isMainTabScreen = user && ['home', 'transactions', 'cash', 'history', 'settings'].includes(currentScreen);
 
   return (
     <div className="mobile-app-shell">
       {!user ? (
         <LoginScreen onLoginSuccess={handleLoginSuccess} />
-      ) : (
-        <>
+      ) : isMainTabScreen ? (
+        <AppShell
+          user={user}
+          onNavigate={navigateTo}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+        >
           {currentScreen === 'home' && <HomeScreen user={user} onNavigate={navigateTo} />}
           {currentScreen === 'transactions' && <TransactionsScreen user={user} onNavigate={navigateTo} />}
           {currentScreen === 'cash' && <CashAtHomeScreen user={user} onNavigate={navigateTo} />}
           {currentScreen === 'history' && <HistoryScreen user={user} onNavigate={navigateTo} />}
           {currentScreen === 'settings' && <SettingsScreen user={user} onLogout={handleLogout} />}
-
+        </AppShell>
+      ) : (
+        <>
           {currentScreen === 'add-income' && (
             <AddIncomeScreen
               initialDate={screenParams.date}
@@ -192,8 +198,6 @@ function AppContent() {
               user={user}
             />
           )}
-
-          {showBottomNav && <BottomNav activeTab={activeTab} onTabChange={handleTabChange} />}
         </>
       )}
     </div>

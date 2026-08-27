@@ -3,6 +3,8 @@ import { Search, Bell, Filter, ShoppingBag, Coffee, Utensils, Briefcase, CreditC
 import { transactionsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
 
+import PageContainer from '../components/PageContainer';
+
 export default function TransactionsScreen({ onNavigate, user }) {
   const { cache, updateCache } = useDataCache();
   const [transactions, setTransactions] = useState(cache.transactions || []);
@@ -54,23 +56,8 @@ export default function TransactionsScreen({ onNavigate, user }) {
   }, {});
 
   return (
-    <div className="screen-container">
-      {/* Header */}
-      <div className="app-header">
-        <div className="app-header-left">
-          <div className="app-avatar-circle">
-            {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'M'}
-          </div>
-          <span className="app-title-text">Money Tracker</span>
-        </div>
-        <div className="app-header-icon">
-          <Bell size={18} />
-        </div>
-      </div>
-
-      <h1 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)' }}>
-        Transactions
-      </h1>
+    <PageContainer>
+      <h1 className="page-title">Transactions</h1>
 
       {/* Search Input */}
       <div className="input-field-wrapper">
@@ -217,6 +204,6 @@ export default function TransactionsScreen({ onNavigate, user }) {
           );
         })
       )}
-    </div>
+    </PageContainer>
   );
 }

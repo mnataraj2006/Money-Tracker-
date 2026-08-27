@@ -3,6 +3,8 @@ import { Bell, ArrowDown, ArrowUp, CheckCircle, Calculator, Moon } from 'lucide-
 import { cashAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
 
+import PageContainer from '../components/PageContainer';
+
 export default function CashAtHomeScreen({ user, onNavigate }) {
   const { cache, updateCache } = useDataCache();
   const [cashData, setCashData] = useState(cache.cash || null);
@@ -35,27 +37,14 @@ export default function CashAtHomeScreen({ user, onNavigate }) {
   const status = cashData?.status || 'TALLIED';
 
   return (
-    <div className="screen-container">
-      {/* Header */}
-      <div className="app-header">
-        <div className="app-header-left">
-          <div className="app-avatar-circle">
-            {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'M'}
-          </div>
-          <span className="app-title-text">Money Tracker</span>
-        </div>
-        <div className="app-header-icon">
-          <Bell size={18} />
-        </div>
-      </div>
-
+    <PageContainer>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <div>
-          <h1 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)' }}>
+          <h1 className="page-title">
             Cash at Home
           </h1>
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-            Last check: 26 Aug 2026
+            Last check: Today
           </div>
         </div>
 
@@ -114,6 +103,6 @@ export default function CashAtHomeScreen({ user, onNavigate }) {
           <Moon size={18} /> Daily Closing
         </button>
       </div>
-    </div>
+    </PageContainer>
   );
 }

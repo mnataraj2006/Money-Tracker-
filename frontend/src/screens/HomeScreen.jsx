@@ -4,6 +4,8 @@ import { summaryAPI, cashAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useDataCache } from '../context/DataContext';
 
+import PageContainer from '../components/PageContainer';
+
 export default function HomeScreen({ user, onNavigate }) {
   const { t, language } = useLanguage();
   const { cache, updateCache } = useDataCache();
@@ -63,24 +65,15 @@ export default function HomeScreen({ user, onNavigate }) {
   };
 
   return (
-    <div className="screen-container">
-      {/* App Header */}
-      <div className="app-header">
-        <div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>
-            {getFormattedTodayDate()}
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)' }}>
-            {t('welcomeBack')}, {firstName}
-          </div>
+    <PageContainer>
+      {/* Welcome Subheader */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+          {getFormattedTodayDate()}
         </div>
-        <div
-          className="app-avatar-circle"
-          onClick={() => onNavigate('settings')}
-          style={{ cursor: 'pointer' }}
-        >
-          {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'A'}
-        </div>
+        <h1 className="page-title" style={{ fontSize: '20px' }}>
+          {t('welcomeBack')}, {firstName}
+        </h1>
       </div>
 
       {/* Main Navy Expected Cash Card */}
@@ -224,6 +217,6 @@ export default function HomeScreen({ user, onNavigate }) {
           )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }
