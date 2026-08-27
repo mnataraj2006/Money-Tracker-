@@ -17,7 +17,7 @@ import HistoryScreen from './screens/HistoryScreen';
 import MonthlySummaryScreen from './screens/MonthlySummaryScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import DailyDetailsScreen from './screens/DailyDetailsScreen';
-import { authAPI } from './services/api';
+import { authAPI, settingsAPI } from './services/api';
 import { LanguageProvider } from './context/LanguageContext';
 import { DataProvider } from './context/DataContext';
 
@@ -65,6 +65,7 @@ function AppContent() {
       setUser(data.user);
       setCurrentScreen('home');
       setActiveTab('home');
+      checkAutomatedWeeklyBackup();
     } catch (err) {
       console.error('Auto-login error:', err);
       setCurrentScreen('login');
@@ -73,10 +74,36 @@ function AppContent() {
     }
   };
 
+  const checkAutomatedWeeklyBackup = async () => {
+    try {
+      const lastBackupStr = localStorage.getItem('money_tracker_last_weekly_backup');
+      const now = new Date();
+      let shouldBackup = true;
+
+      if (lastBackupStr) {
+        const lastDate = new Date(lastBackupStr);
+        const diffDays = (now - lastDate) / (1000 * 60 * 60 * 24);
+        if (diffDays < 7) {
+          shouldBackup = false;
+        }
+      }
+
+      if (shouldBackup) {
+        const backupData = await settingsAPI.exportBackup();
+        localStorage.setItem('money_tracker_weekly_backup_data', JSON.stringify(backupData));
+        localStorage.setItem('money_tracker_last_weekly_backup', now.toISOString());
+        console.log('Automated weekly backup completed successfully!');
+      }
+    } catch (err) {
+      console.error('Automated weekly backup error:', err);
+    }
+  };
+
   const handleLoginSuccess = (userData) => {
     setUser(userData);
     setCurrentScreen('home');
     setActiveTab('home');
+    checkAutomatedWeeklyBackup();
   };
 
   const handleLogout = () => {

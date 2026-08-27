@@ -79,6 +79,52 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ error: 'Database error during login' });
+// GOOGLE AUTH LOGIN / REGISTER
+router.post('/google', async (req, res) => {
+  const { credential, email, fullName } = req.body;
+
+  try {
+    let userEmail = email ? email.trim().toLowerCase() : '';
+    let userFullName = fullName ? fullName.trim() : 'Google User';
+
+    if (credential) {
+      const parts = credential.split('.');
+      if (parts.length === 3) {
+        const payloadStr = Buffer.from(parts[1], 'base64').toString('utf8');
+        const payload = JSON.parse(payloadStr);
+        if (payload.email) userEmail = payload.email.trim().toLowerCase();
+        if (payload.name) userFullName = payload.name.trim();
+      }
+    }
+
+    if (!userEmail) {
+      return res.status(400).json({ error: 'Google login failed: Email not provided' });
+    }
+
+    let user = await User.findOne({ email: userEmail });
+    if (!user) {
+      const userId = crypto.randomUUID();
+      const passwordHash = await bcrypt.hash(`google_${userId}`, 10);
+      user = new User({
+        id: userId,
+        fullName: userFullName,
+        email: userEmail,
+        passwordHash
+      });
+      await user.save();
+      await Settings.create({ userId, currency: 'INR', notifications: true, appearance: 'Light', language: 'en' });
+    }
+
+    const token = jwt.sign({ userId: user.id, email: user.email, fullName: user.fullName }, JWT_SECRET, { expiresIn: '30d' });
+
+    return res.json({
+      message: 'Google login successful',
+      token,
+      user: { id: user.id, fullName: user.fullName, email: user.email }
+    });
+  } catch (err) {
+    console.error('Google auth error:', err);
+    return res.status(500).json({ error: 'Google sign-in failed' });
   }
 });
 

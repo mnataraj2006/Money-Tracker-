@@ -34,6 +34,8 @@ export const authAPI = {
     request('/auth/register', { method: 'POST', body: JSON.stringify({ fullName, email, password }) }),
   login: (email, password) =>
     request('/auth/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
+  googleLogin: (googleData) =>
+    request('/auth/google', { method: 'POST', body: JSON.stringify(googleData) }),
   getMe: () => request('/auth/me'),
   changePassword: (oldPassword, newPassword) =>
     request('/auth/change-password', { method: 'POST', body: JSON.stringify({ oldPassword, newPassword }) })
