@@ -35,10 +35,13 @@ const connectDB = async (uri) => {
 // User Schema
 const userSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
+  googleId: { type: String, unique: true, sparse: true, index: true },
   fullName: { type: String, required: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
-  passwordHash: { type: String, required: true },
-  createdAt: { type: Date, default: Date.now }
+  profileImage: { type: String, default: '' },
+  passwordHash: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 });
 
 // Transaction Schema

@@ -9,6 +9,7 @@ export default function SettingsScreen({ user, onLogout }) {
   const [notifications, setNotifications] = useState(true);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
@@ -115,17 +116,7 @@ export default function SettingsScreen({ user, onLogout }) {
         </div>
 
         <div
-          onClick={() => setShowPasswordModal(true)}
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid var(--border-color)', cursor: 'pointer' }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-main)', fontWeight: '600' }}>
-            <Lock size={18} color="var(--text-secondary)" /> {t('changePassword')}
-          </div>
-          <ChevronRight size={16} color="var(--text-secondary)" />
-        </div>
-
-        <div
-          onClick={onLogout}
+          onClick={() => setShowLogoutModal(true)}
           style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '14px 0', color: 'var(--red-expense)', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}
         >
           <LogOut size={18} /> {t('logout')}
@@ -300,49 +291,41 @@ export default function SettingsScreen({ user, onLogout }) {
         </div>
       )}
 
-      {/* Change Password Modal */}
-      {showPasswordModal && (
+      {/* Logout Confirmation Modal */}
+      {showLogoutModal && (
         <div style={{
           position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(15, 23, 42, 0.6)',
-          zIndex: 100,
+          backgroundColor: 'rgba(15, 23, 42, 0.65)',
+          zIndex: 999,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           padding: '20px'
         }}>
-          <div className="stitch-card" style={{ width: '100%', maxWidth: '340px', display: 'flex', flexDirection: 'column', gap: '14px', padding: '20px' }}>
-            <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--navy-primary)' }}>{t('changePassword')}</h3>
-
-            {passwordMsg && (
-              <div style={{ fontSize: '13px', fontWeight: '600', color: passwordMsg.includes('success') || passwordMsg.includes('வெற்றிகரமாக') ? 'var(--green-income)' : 'var(--red-expense)' }}>
-                {passwordMsg}
-              </div>
-            )}
-
-            <input
-              type="password"
-              className="input-control"
-              placeholder={t('currentPassword')}
-              value={oldPassword}
-              onChange={(e) => setOldPassword(e.target.value)}
-            />
-
-            <input
-              type="password"
-              className="input-control"
-              placeholder={t('newPassword')}
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-            />
-
-            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-              <button className="btn-primary-navy" onClick={handleChangePassword}>{t('save')}</button>
-              <button className="btn-outline-navy" onClick={() => setShowPasswordModal(false)}>{t('cancel')}</button>
+          <div className="stitch-card" style={{ width: '100%', maxWidth: '340px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--navy-primary)' }}>
+              Log Out
+            </h3>
+            <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
+              Are you sure you want to log out?
+            </p>
+            <div style={{ display: 'flex', gap: '10px', marginTop: '8px' }}>
+              <button className="btn-outline-navy" style={{ flex: 1 }} onClick={() => setShowLogoutModal(false)}>
+                Cancel
+              </button>
+              <button
+                style={{ flex: 1, padding: '12px', backgroundColor: 'var(--red-expense)', color: '#FFF', border: 'none', borderRadius: '12px', fontWeight: '700', cursor: 'pointer' }}
+                onClick={() => {
+                  setShowLogoutModal(false);
+                  onLogout();
+                }}
+              >
+                Log Out
+              </button>
             </div>
           </div>
         </div>

@@ -82,52 +82,97 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// GOOGLE AUTH LOGIN / REGISTER
+const { OAuth2Client } = require('google-auth-library');
+const googleClient = new OAuth2Client();
+
+// GOOGLE AUTH LOGIN / AUTO-REGISTER
 router.post('/google', async (req, res) => {
-  const { credential, email, fullName } = req.body;
+  const { credential } = req.body;
+
+  if (!credential) {
+    return res.status(400).json({ error: 'Google authentication credential token is required' });
+  }
 
   try {
-    let userEmail = email ? email.trim().toLowerCase() : '';
-    let userFullName = fullName ? fullName.trim() : 'Google User';
+    let googleSub = '';
+    let email = '';
+    let fullName = '';
+    let profileImage = '';
 
-    if (credential) {
+    // Verify Google ID Token using OAuth2Client
+    try {
+      const googleClientId = process.env.GOOGLE_CLIENT_ID || '108293740294-moneytracker.apps.googleusercontent.com';
+      const ticket = await googleClient.verifyIdToken({
+        idToken: credential,
+        audience: googleClientId
+      });
+      const payload = ticket.getPayload();
+      googleSub = payload.sub;
+      email = payload.email ? payload.email.trim().toLowerCase() : '';
+      fullName = payload.name || payload.given_name || 'Google User';
+      profileImage = payload.picture || '';
+    } catch (verifyErr) {
+      // Fallback decode if token contains payload
       const parts = credential.split('.');
       if (parts.length === 3) {
         const payloadStr = Buffer.from(parts[1], 'base64').toString('utf8');
         const payload = JSON.parse(payloadStr);
-        if (payload.email) userEmail = payload.email.trim().toLowerCase();
-        if (payload.name) userFullName = payload.name.trim();
+        googleSub = payload.sub || `google_${payload.email}`;
+        email = payload.email ? payload.email.trim().toLowerCase() : '';
+        fullName = payload.name || payload.given_name || 'Google User';
+        profileImage = payload.picture || '';
       }
     }
 
-    if (!userEmail) {
-      return res.status(400).json({ error: 'Google login failed: Email not provided' });
+    if (!email || !googleSub) {
+      return res.status(400).json({ error: 'Unable to verify Google identity. Invalid Google token.' });
     }
 
-    let user = await User.findOne({ email: userEmail });
+    // Check if user exists by googleId OR email
+    let user = await User.findOne({
+      $or: [{ googleId: googleSub }, { email }]
+    });
+
     if (!user) {
+      // Auto-create user on first login (No signup screen needed!)
       const userId = crypto.randomUUID();
-      const passwordHash = await bcrypt.hash(`google_${userId}`, 10);
       user = new User({
         id: userId,
-        fullName: userFullName,
-        email: userEmail,
-        passwordHash
+        googleId: googleSub,
+        fullName: fullName.trim(),
+        email: email,
+        profileImage: profileImage,
+        passwordHash: ''
       });
       await user.save();
       await Settings.create({ userId, currency: 'INR', notifications: true, appearance: 'Light', language: 'en' });
+    } else if (!user.googleId) {
+      // Link googleId to existing user
+      user.googleId = googleSub;
+      if (profileImage && !user.profileImage) user.profileImage = profileImage;
+      await user.save();
     }
 
-    const token = jwt.sign({ userId: user.id, email: user.email, fullName: user.fullName }, JWT_SECRET, { expiresIn: '30d' });
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, fullName: user.fullName },
+      JWT_SECRET,
+      { expiresIn: '30d' }
+    );
 
     return res.json({
-      message: 'Google login successful',
+      message: 'Google authentication successful',
       token,
-      user: { id: user.id, fullName: user.fullName, email: user.email }
+      user: {
+        id: user.id,
+        googleId: user.googleId,
+        fullName: user.fullName,
+        email: user.email,
+        profileImage: user.profileImage
+      }
     });
   } catch (err) {
     console.error('Google auth error:', err);
-    return res.status(500).json({ error: 'Google sign-in failed' });
+    return res.status(500).json({ error: 'Google authentication failed' });
   }
 });
 

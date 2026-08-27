@@ -3,7 +3,6 @@ import './styles/tokens.css';
 import BottomNav from './components/BottomNav';
 
 import LoginScreen from './screens/LoginScreen';
-import RegisterScreen from './screens/RegisterScreen';
 import HomeScreen from './screens/HomeScreen';
 import AddIncomeScreen from './screens/AddIncomeScreen';
 import AddExpenseScreen from './screens/AddExpenseScreen';
@@ -48,30 +47,9 @@ function AppContent() {
       }
     }
 
-    // Auto-login to default account for Father's single-user phone access
-    try {
-      const defaultEmail = 'father@moneytracker.local';
-      const defaultPassword = 'fatherpassword123';
-      
-      let data;
-      try {
-        data = await authAPI.login(defaultEmail, defaultPassword);
-      } catch (e) {
-        // Create account if first time
-        data = await authAPI.register('Manoharan', defaultEmail, defaultPassword);
-      }
-
-      localStorage.setItem('money_tracker_token', data.token);
-      setUser(data.user);
-      setCurrentScreen('home');
-      setActiveTab('home');
-      checkAutomatedWeeklyBackup();
-    } catch (err) {
-      console.error('Auto-login error:', err);
-      setCurrentScreen('login');
-    } finally {
-      setLoading(false);
-    }
+    setUser(null);
+    setCurrentScreen('login');
+    setLoading(false);
   };
 
   const checkAutomatedWeeklyBackup = async () => {
@@ -138,17 +116,7 @@ function AppContent() {
   return (
     <div className="mobile-app-shell">
       {!user ? (
-        currentScreen === 'register' ? (
-          <RegisterScreen
-            onRegisterSuccess={handleLoginSuccess}
-            onNavigateToLogin={() => setCurrentScreen('login')}
-          />
-        ) : (
-          <LoginScreen
-            onLoginSuccess={handleLoginSuccess}
-            onNavigateToRegister={() => setCurrentScreen('register')}
-          />
-        )
+        <LoginScreen onLoginSuccess={handleLoginSuccess} />
       ) : (
         <>
           {currentScreen === 'home' && <HomeScreen user={user} onNavigate={navigateTo} />}
