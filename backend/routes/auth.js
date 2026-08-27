@@ -79,6 +79,9 @@ router.post('/login', async (req, res) => {
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ error: 'Database error during login' });
+  }
+});
+
 // GOOGLE AUTH LOGIN / REGISTER
 router.post('/google', async (req, res) => {
   const { credential, email, fullName } = req.body;
