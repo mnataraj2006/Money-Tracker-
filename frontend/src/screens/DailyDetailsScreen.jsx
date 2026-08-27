@@ -21,7 +21,7 @@ import {
   Calculator,
   X
 } from 'lucide-react';
-import { transactionsAPI, cashAPI } from '../services/api';
+import { transactionsAPI, summaryAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, user }) {
@@ -49,12 +49,9 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
     try {
       setLoading(true);
       setError(null);
-      const [txRes, cashRes] = await Promise.all([
-        transactionsAPI.getAll({ date: currentDate }),
-        cashAPI.getExpected(currentDate)
-      ]);
-      setTransactions(txRes.transactions || []);
-      setCashData(cashRes);
+      const res = await summaryAPI.getDailyDetails(currentDate);
+      setTransactions(res.transactions || []);
+      setCashData(res);
     } catch (err) {
       console.error('Failed to load daily details:', err);
       setError('Unable to load daily details. Please try again.');

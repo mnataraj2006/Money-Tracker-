@@ -22,14 +22,11 @@ export default function HomeScreen({ user, onNavigate }) {
     try {
       if (!cache.dashboard) setLoading(true);
       const today = new Date().toISOString().split('T')[0];
-      const [dash, cash] = await Promise.all([
-        summaryAPI.getDashboard(today),
-        cashAPI.getExpected(today)
-      ]);
+      const dash = await summaryAPI.getDashboard(today);
       setData(dash);
-      setCashData(cash);
+      setCashData(dash);
       updateCache('dashboard', dash);
-      updateCache('cash', cash);
+      updateCache('cash', dash);
     } catch (err) {
       console.error('Failed to load dashboard:', err);
     } finally {

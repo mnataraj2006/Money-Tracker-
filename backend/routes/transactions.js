@@ -5,10 +5,10 @@ const { Transaction } = require('../db_mongo');
 const { authenticateToken } = require('../middleware/auth');
 const { recalculateDailyClosingsFrom } = require('./cash');
 
-// GET ALL TRANSACTIONS WITH FILTERS
+// GET ALL TRANSACTIONS WITH OPTIONAL PAGINATION AND FILTERS
 router.get('/', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-  const { date, type, category, search, month } = req.query;
+  const { date, type, category, search, month, page, limit } = req.query;
 
   try {
     const query = { userId };
@@ -36,8 +36,30 @@ router.get('/', authenticateToken, async (req, res) => {
       ];
     }
 
-    const transactions = await Transaction.find(query).sort({ date: -1, createdAt: -1 });
-    return res.json({ transactions });
+    // Pagination logic
+    const pageNum = parseInt(page, 10) || 1;
+    const limitNum = parseInt(limit, 10) || 50;
+    const skip = (pageNum - 1) * limitNum;
+
+    const [transactions, total] = await Promise.all([
+      Transaction.find(query)
+        .sort({ date: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limitNum)
+        .select('id type amount category paymentMethod description date createdAt')
+        .lean(),
+      Transaction.countDocuments(query)
+    ]);
+
+    return res.json({
+      transactions,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum)
+      }
+    });
   } catch (err) {
     console.error('Error fetching transactions:', err);
     return res.status(500).json({ error: 'Failed to fetch transactions' });

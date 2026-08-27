@@ -89,66 +89,16 @@ async function autoClosePastDays(userId) {
   }
 }
 
-// GET EXPECTED CASH AND TODAY'S CASH SUMMARY
+const CashCalculationService = require('../services/cashCalculationService');
+
+// GET EXPECTED CASH AND TODAY'S CASH SUMMARY — OPTIMIZED FAST READ
 router.get('/expected', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
   const targetDate = req.query.date || new Date().toISOString().split('T')[0];
 
   try {
-    await autoClosePastDays(userId);
-    const previousDayCash = await getPreviousClosingCash(userId, targetDate);
-
-    // Sum today's cash income and cash expense strictly where paymentMethod = 'CASH'
-    const cashTxs = await Transaction.find({
-      userId,
-      date: targetDate,
-      paymentMethod: 'CASH'
-    });
-
-    let todayCashIncome = 0;
-    let todayCashExpense = 0;
-
-    cashTxs.forEach(t => {
-      if (t.type === 'INCOME') todayCashIncome += t.amount;
-      if (t.type === 'EXPENSE') todayCashExpense += t.amount;
-    });
-
-    const expectedCash = previousDayCash + todayCashIncome - todayCashExpense;
-
-    const countRow = await CashCount.findOne({ userId, date: targetDate }).sort({ createdAt: -1 });
-    const closingRow = await DailyClosing.findOne({ userId, date: targetDate });
-
-    let physicalCash;
-    if (countRow) {
-      physicalCash = countRow.physicalCash;
-    } else if (closingRow && closingRow.isClosed && closingRow.physicalCash !== undefined && closingRow.physicalCash !== null) {
-      physicalCash = closingRow.physicalCash;
-    } else {
-      physicalCash = expectedCash;
-    }
-
-    let difference = physicalCash - expectedCash;
-    let status = 'TALLIED';
-
-    if (countRow || (closingRow && closingRow.isClosed)) {
-      if (difference === 0) status = 'TALLIED';
-      else if (difference < 0) status = 'SHORT';
-      else status = 'EXTRA';
-    }
-
-    return res.json({
-      date: targetDate,
-      previousDayCash,
-      todayCashIncome,
-      todayCashExpense,
-      expectedCash,
-      physicalCash,
-      difference,
-      status,
-      isClosed: closingRow ? closingRow.isClosed : false,
-      lastCheckDate: countRow ? countRow.createdAt : null,
-      counts: countRow || null
-    });
+    const cashData = await CashCalculationService.getExpectedCash(userId, targetDate);
+    return res.json(cashData);
   } catch (err) {
     console.error('Error fetching cash calculation:', err);
     return res.status(500).json({ error: 'Failed to compute cash logic' });

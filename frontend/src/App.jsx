@@ -89,6 +89,7 @@ function AppContent() {
 
   const handleLogout = () => {
     localStorage.removeItem('money_tracker_token');
+    localStorage.removeItem('money_tracker_language');
     setUser(null);
     setCurrentScreen('login');
   };

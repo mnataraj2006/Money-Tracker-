@@ -66,6 +66,7 @@ export const cashAPI = {
 export const summaryAPI = {
   getDashboard: (date) => request(`/summary/dashboard${date ? '?date=' + date : ''}`),
   getHistory: (month) => request(`/summary/history${month ? '?month=' + month : ''}`),
+  getDailyDetails: (date) => request(`/summary/daily-details${date ? '?date=' + date : ''}`),
   getMonthlySummary: (month) => request(`/summary/monthly-summary${month ? '?month=' + month : ''}`)
 };
 

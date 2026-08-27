@@ -2,71 +2,46 @@ const express = require('express');
 const router = express.Router();
 const { User, Transaction, DailyClosing, CashCount } = require('../db_mongo');
 const { authenticateToken } = require('../middleware/auth');
-const { autoClosePastDays } = require('./cash');
+const CashCalculationService = require('../services/cashCalculationService');
 
-async function getPreviousClosingCash(userId, targetDate) {
-  try {
-    // 1. Look for latest closed day STRICTLY BEFORE targetDate
-    const prevClosing = await DailyClosing.findOne({
-      userId,
-      date: { $lt: targetDate },
-      isClosed: true
-    }).sort({ date: -1 });
-
-    if (prevClosing) {
-      return prevClosing.physicalCash !== undefined && prevClosing.physicalCash !== null
-        ? prevClosing.physicalCash
-        : prevClosing.expectedClosingCash;
-    }
-
-    // 2. Look for latest cash count STRICTLY BEFORE targetDate
-    const latestCount = await CashCount.findOne({
-      userId,
-      date: { $lt: targetDate }
-    }).sort({ date: -1, createdAt: -1 });
-
-    if (latestCount) return latestCount.physicalCash;
-
-    return 0;
-  } catch (err) {
-    return 0;
-  }
-}
-
-// DASHBOARD SUMMARY
+// 1. DASHBOARD SUMMARY — OPTIMIZED WITH MONGODB AGGREGATION & CASH SERVICE
 router.get('/dashboard', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
   const today = req.query.date || new Date().toISOString().split('T')[0];
 
   try {
-    const user = await User.findOne({ id: userId }).select('id fullName email');
+    const [user, cashData, todayAgg, recentTransactions] = await Promise.all([
+      User.findOne({ id: userId }).select('id fullName email profileImage').lean(),
+      CashCalculationService.getExpectedCash(userId, today),
+      Transaction.aggregate([
+        { $match: { userId, date: today } },
+        {
+          $group: {
+            _id: '$type',
+            total: { $sum: '$amount' }
+          }
+        }
+      ]),
+      Transaction.find({ userId, date: today })
+        .sort({ createdAt: -1 })
+        .limit(5)
+        .select('id type amount category paymentMethod description date')
+        .lean()
+    ]);
+
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const todayTxs = await Transaction.find({ userId, date: today });
-
     let todayIncome = 0;
     let todayExpense = 0;
-    let todayCashIncome = 0;
-    let todayCashExpense = 0;
 
-    todayTxs.forEach(r => {
-      if (r.type === 'INCOME') {
-        todayIncome += r.amount;
-        if (r.paymentMethod === 'CASH') todayCashIncome += r.amount;
-      } else if (r.type === 'EXPENSE') {
-        todayExpense += r.amount;
-        if (r.paymentMethod === 'CASH') todayCashExpense += r.amount;
-      }
+    todayAgg.forEach(item => {
+      if (item._id === 'INCOME') todayIncome = item.total;
+      if (item._id === 'EXPENSE') todayExpense = item.total;
     });
 
     const todayBalance = todayIncome - todayExpense;
-
-    const previousDayCash = await getPreviousClosingCash(userId, today);
-    const expectedCash = previousDayCash + todayCashIncome - todayCashExpense;
-
-    const recentTransactions = await Transaction.find({ userId, date: today }).sort({ createdAt: -1 }).limit(5);
 
     return res.json({
       user,
@@ -74,10 +49,12 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       todayIncome,
       todayExpense,
       todayBalance,
-      todayCashIncome,
-      todayCashExpense,
-      previousDayCash,
-      expectedCash,
+      todayCashIncome: cashData.todayCashIncome,
+      todayCashExpense: cashData.todayCashExpense,
+      previousDayCash: cashData.previousDayCash,
+      expectedCash: cashData.expectedCash,
+      physicalCash: cashData.physicalCash,
+      status: cashData.status,
       recentTransactions
     });
   } catch (err) {
@@ -86,21 +63,27 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
   }
 });
 
-// DAILY HISTORY LIST
-// DAILY HISTORY LIST - OPTIMIZED
+// 2. DAILY HISTORY LIST — LIGHTWEIGHT DAILY SUMMARIES ONLY
 router.get('/history', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
   const month = req.query.month || new Date().toISOString().substring(0, 7);
 
   try {
-    await autoClosePastDays(userId);
-
     const monthPrefix = `${month}-`;
     const monthRegex = new RegExp(`^${month}`);
 
-    // Parallel MongoDB queries with lean() for maximum performance
-    const [monthTxs, closingRows, countRows, prevClosingDoc] = await Promise.all([
-      Transaction.find({ userId, date: monthRegex }).sort({ date: -1, createdAt: -1 }).lean(),
+    // Parallel MongoDB queries with lean() and projection
+    const [monthTxsAgg, closingRows, countRows, prevClosingDoc] = await Promise.all([
+      Transaction.aggregate([
+        { $match: { userId, date: monthRegex } },
+        {
+          $group: {
+            _id: { date: '$date', type: '$type', paymentMethod: '$paymentMethod' },
+            totalAmount: { $sum: '$amount' },
+            count: { $sum: 1 }
+          }
+        }
+      ]),
       DailyClosing.find({ userId, date: monthRegex }).lean(),
       CashCount.find({ userId, date: monthRegex }).sort({ createdAt: -1 }).lean(),
       DailyClosing.findOne({ userId, date: { $lt: monthPrefix }, isClosed: true }).sort({ date: -1 }).lean()
@@ -118,39 +101,36 @@ router.get('/history', authenticateToken, async (req, res) => {
 
     const datesMap = {};
 
-    monthTxs.forEach(r => {
-      if (!datesMap[r.date]) {
-        datesMap[r.date] = {
-          date: r.date,
+    monthTxsAgg.forEach(item => {
+      const date = item._id.date;
+      const type = item._id.type;
+      const paymentMethod = item._id.paymentMethod;
+      const amount = item.totalAmount;
+
+      if (!datesMap[date]) {
+        datesMap[date] = {
+          date,
           income: 0,
           expense: 0,
           cashIncome: 0,
           cashExpense: 0,
           status: 'TALLIED',
-          cash: 0,
           openingCash: 0,
           expectedCash: 0,
           physicalCash: null,
           difference: 0,
-          transactions: []
+          txCount: 0
         };
       }
-      datesMap[r.date].transactions.push({
-        id: r.id,
-        type: r.type,
-        amount: r.amount,
-        category: r.category,
-        paymentMethod: r.paymentMethod,
-        description: r.description
-      });
 
-      if (r.type === 'INCOME') {
-        datesMap[r.date].income += r.amount;
-        if (r.paymentMethod === 'CASH') datesMap[r.date].cashIncome += r.amount;
+      datesMap[date].txCount += item.count;
+      if (type === 'INCOME') {
+        datesMap[date].income += amount;
+        if (paymentMethod === 'CASH') datesMap[date].cashIncome += amount;
       }
-      if (r.type === 'EXPENSE') {
-        datesMap[r.date].expense += r.amount;
-        if (r.paymentMethod === 'CASH') datesMap[r.date].cashExpense += r.amount;
+      if (type === 'EXPENSE') {
+        datesMap[date].expense += amount;
+        if (paymentMethod === 'CASH') datesMap[date].cashExpense += amount;
       }
     });
 
@@ -163,16 +143,14 @@ router.get('/history', authenticateToken, async (req, res) => {
           cashIncome: c.cashIncome || 0,
           cashExpense: c.cashExpense || 0,
           status: c.status,
-          cash: c.physicalCash,
           openingCash: c.openingCash || 0,
           expectedCash: c.expectedClosingCash || 0,
           physicalCash: c.physicalCash,
           difference: c.difference || 0,
-          transactions: []
+          txCount: 0
         };
       } else {
         datesMap[c.date].status = c.status;
-        datesMap[c.date].cash = c.physicalCash;
         datesMap[c.date].openingCash = c.openingCash || datesMap[c.date].openingCash;
         datesMap[c.date].expectedCash = c.expectedClosingCash || datesMap[c.date].expectedCash;
         datesMap[c.date].physicalCash = c.physicalCash;
@@ -189,24 +167,17 @@ router.get('/history', authenticateToken, async (req, res) => {
           cashIncome: 0,
           cashExpense: 0,
           status: 'TALLIED',
-          cash: cnt.physicalCash,
           openingCash: 0,
           expectedCash: cnt.physicalCash,
           physicalCash: cnt.physicalCash,
           difference: 0,
-          transactions: []
+          txCount: 0
         };
-      } else {
-        if (!datesMap[cnt.date].cash || datesMap[cnt.date].cash === 0) {
-          datesMap[cnt.date].cash = cnt.physicalCash;
-        }
-        if (datesMap[cnt.date].physicalCash === null || datesMap[cnt.date].physicalCash === undefined) {
-          datesMap[cnt.date].physicalCash = cnt.physicalCash;
-        }
+      } else if (datesMap[cnt.date].physicalCash === null || datesMap[cnt.date].physicalCash === undefined) {
+        datesMap[cnt.date].physicalCash = cnt.physicalCash;
       }
     });
 
-    // Fast in-memory calculation (0 DB roundtrips)
     const sortedDates = Object.keys(datesMap).sort();
     let currentOpening = defaultOpeningCash;
 
@@ -220,7 +191,7 @@ router.get('/history', authenticateToken, async (req, res) => {
         item.expectedCash = item.openingCash + item.cashIncome - item.cashExpense;
       }
       if (item.physicalCash === null || item.physicalCash === undefined) {
-        item.physicalCash = item.cash || item.expectedCash;
+        item.physicalCash = item.expectedCash;
       }
       item.difference = item.physicalCash - item.expectedCash;
       if (item.difference === 0) item.status = 'TALLIED';
@@ -233,51 +204,128 @@ router.get('/history', authenticateToken, async (req, res) => {
     const dailyHistory = Object.values(datesMap).sort((a, b) => b.date.localeCompare(a.date));
     return res.json({ month, history: dailyHistory });
   } catch (err) {
-    console.error('Error fetching history:', err);
+    console.error('Error fetching history list:', err);
     return res.status(500).json({ error: 'Database error fetching history' });
   }
 });
 
-// MONTHLY SUMMARY
+// 3. DEDICATED DAILY DETAILS ENDPOINT — FETCH TRANSACTIONS FOR SPECIFIC DATE ONLY
+router.get('/daily-details', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const targetDate = req.query.date || new Date().toISOString().split('T')[0];
+
+  try {
+    const [cashData, dateTxs, countRow, closingRow] = await Promise.all([
+      CashCalculationService.getExpectedCash(userId, targetDate),
+      Transaction.find({ userId, date: targetDate })
+        .sort({ createdAt: -1 })
+        .select('id type amount category paymentMethod description date')
+        .lean(),
+      CashCount.findOne({ userId, date: targetDate }).sort({ createdAt: -1 }).lean(),
+      DailyClosing.findOne({ userId, date: targetDate }).lean()
+    ]);
+
+    let dayIncome = 0;
+    let dayExpense = 0;
+
+    dateTxs.forEach(t => {
+      if (t.type === 'INCOME') dayIncome += t.amount;
+      if (t.type === 'EXPENSE') dayExpense += t.amount;
+    });
+
+    return res.json({
+      date: targetDate,
+      income: dayIncome,
+      expense: dayExpense,
+      net: dayIncome - dayExpense,
+      openingCash: cashData.previousDayCash,
+      cashIncome: cashData.todayCashIncome,
+      cashExpense: cashData.todayCashExpense,
+      expectedCash: cashData.expectedCash,
+      physicalCash: cashData.physicalCash,
+      difference: cashData.difference,
+      status: cashData.status,
+      isClosed: cashData.isClosed,
+      counts: countRow || null,
+      closingRow: closingRow || null,
+      transactions: dateTxs
+    });
+  } catch (err) {
+    console.error('Error fetching daily details:', err);
+    return res.status(500).json({ error: 'Failed to fetch daily details' });
+  }
+});
+
+// 4. MONTHLY SUMMARY — MONGODB AGGREGATION PIPELINE
 router.get('/monthly-summary', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
   const month = req.query.month || new Date().toISOString().substring(0, 7);
 
   try {
     const monthRegex = new RegExp(`^${month}`);
-    const rows = await Transaction.find({ userId, date: monthRegex });
 
-    let totalIncome = 0;
-    let totalExpenses = 0;
-    let cashIncome = 0;
-    let cashExpenses = 0;
-    const expenseByCategory = {};
-
-    rows.forEach(r => {
-      if (r.type === 'INCOME') {
-        totalIncome += r.amount;
-        if (r.paymentMethod === 'CASH') cashIncome += r.amount;
-      } else if (r.type === 'EXPENSE') {
-        totalExpenses += r.amount;
-        if (r.paymentMethod === 'CASH') cashExpenses += r.amount;
-
-        if (!expenseByCategory[r.category]) {
-          expenseByCategory[r.category] = 0;
+    // Single aggregation pipeline for totals and category breakdown
+    const [totalsAgg, categoriesAgg] = await Promise.all([
+      Transaction.aggregate([
+        { $match: { userId, date: monthRegex } },
+        {
+          $group: {
+            _id: null,
+            totalIncome: {
+              $sum: { $cond: [{ $eq: ['$type', 'INCOME'] }, '$amount', 0] }
+            },
+            totalExpenses: {
+              $sum: { $cond: [{ $eq: ['$type', 'EXPENSE'] }, '$amount', 0] }
+            },
+            cashIncome: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ['$type', 'INCOME'] }, { $eq: ['$paymentMethod', 'CASH'] }] },
+                  '$amount',
+                  0
+                ]
+              }
+            },
+            cashExpenses: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ['$type', 'EXPENSE'] }, { $eq: ['$paymentMethod', 'CASH'] }] },
+                  '$amount',
+                  0
+                ]
+              }
+            }
+          }
         }
-        expenseByCategory[r.category] += r.amount;
-      }
-    });
+      ]),
+      Transaction.aggregate([
+        { $match: { userId, date: monthRegex, type: 'EXPENSE' } },
+        {
+          $group: {
+            _id: '$category',
+            amount: { $sum: '$amount' }
+          }
+        },
+        { $sort: { amount: -1 } }
+      ])
+    ]);
+
+    const totals = totalsAgg.length > 0 ? totalsAgg[0] : { totalIncome: 0, totalExpenses: 0, cashIncome: 0, cashExpenses: 0 };
+    const totalIncome = totals.totalIncome;
+    const totalExpenses = totals.totalExpenses;
+    const cashIncome = totals.cashIncome;
+    const cashExpenses = totals.cashExpenses;
 
     const netBalance = totalIncome - totalExpenses;
     const totalFlow = totalIncome + totalExpenses;
     const incomePercent = totalFlow > 0 ? Math.round((totalIncome / totalFlow) * 100) : 50;
     const expensePercent = totalFlow > 0 ? 100 - incomePercent : 50;
 
-    const categoryBreakdown = Object.keys(expenseByCategory).map(cat => {
-      const amount = expenseByCategory[cat];
-      const percentage = totalExpenses > 0 ? Math.round((amount / totalExpenses) * 100) : 0;
-      return { category: cat, amount, percentage };
-    }).sort((a, b) => b.amount - a.amount);
+    const categoryBreakdown = categoriesAgg.map(cat => ({
+      category: cat._id,
+      amount: cat.amount,
+      percentage: totalExpenses > 0 ? Math.round((cat.amount / totalExpenses) * 100) : 0
+    }));
 
     return res.json({
       month,
