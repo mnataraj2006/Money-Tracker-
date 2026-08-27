@@ -10,6 +10,19 @@ export default function LoginScreen({ onLoginSuccess }) {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || '760935628306-adaehnvi7ktav0u2hsq0kr0mt4fheife.apps.googleusercontent.com';
 
   useEffect(() => {
+    // 1. Check if returning from Google OAuth redirect with id_token
+    const hash = window.location.hash;
+    if (hash && (hash.includes('id_token=') || hash.includes('access_token='))) {
+      const params = new URLSearchParams(hash.replace('#', '?'));
+      const idToken = params.get('id_token');
+      if (idToken) {
+        window.history.replaceState(null, null, window.location.pathname);
+        handleGoogleCredentialResponse({ credential: idToken });
+        return;
+      }
+    }
+
+    // 2. Initialize Google Identity Services
     const initGoogleGIS = () => {
       if (window.google?.accounts?.id) {
         try {
@@ -59,17 +72,25 @@ export default function LoginScreen({ onLoginSuccess }) {
     }
   };
 
-  const handleManualGoogleClick = () => {
+  const handleGoogleOAuthRedirect = () => {
     setError('');
     if (window.google?.accounts?.id) {
       window.google.accounts.id.prompt((notification) => {
         if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          console.log('Google One Tap prompt notification:', notification);
+          // Fallback to standard Google OAuth popup/redirect
+          triggerDirectGoogleOAuth();
         }
       });
     } else {
-      setError('Initializing Google Sign-In...');
+      triggerDirectGoogleOAuth();
     }
+  };
+
+  const triggerDirectGoogleOAuth = () => {
+    const redirectUri = window.location.origin;
+    const scope = 'openid profile email';
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token%20id_token&scope=${encodeURIComponent(scope)}&nonce=moneytracker_${Date.now()}`;
+    window.location.href = authUrl;
   };
 
   return (
@@ -119,7 +140,7 @@ export default function LoginScreen({ onLoginSuccess }) {
         }}>
           <span>{error}</span>
           <button
-            onClick={handleManualGoogleClick}
+            onClick={handleGoogleOAuthRedirect}
             style={{
               padding: '6px 14px',
               backgroundColor: '#991B1B',
