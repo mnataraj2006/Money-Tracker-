@@ -58,40 +58,36 @@
 
 body {
   font-family: var(--font-family);
-  background-color: #0F172A;
+  background-color: var(--bg-app);
   color: var(--text-main);
-  display: flex;
-  justify-content: center;
-  align-items: center;
+  margin: 0;
+  padding: 0;
+  width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-x: hidden;
 }
 
-/* Mobile Frame Container for true phone experience on desktop, full size on mobile */
+#root {
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Full-Screen Mobile App Shell (100% Viewport Width & Height) */
 .mobile-app-shell {
   width: 100%;
-  max-width: 430px;
   height: 100vh;
-  max-height: 932px;
+  height: 100dvh;
   background-color: var(--bg-app);
   display: flex;
   flex-direction: column;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-}
-
-@media (max-width: 480px) {
-  body {
-    background-color: var(--bg-app);
-  }
-  .mobile-app-shell {
-    max-width: 100%;
-    height: 100dvh;
-    max-height: 100dvh;
-    border-radius: 0;
-    box-shadow: none;
-  }
+  margin: 0;
+  padding: 0;
 }
 
 .screen-container {
@@ -111,6 +107,7 @@ body {
 /* Scrollable Main Content Container */
 .main-content-scroll {
   flex: 1;
+  width: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
@@ -118,10 +115,11 @@ body {
   flex-direction: column;
 }
 
-/* Page Container (Shared content box with global margins) */
+/* Page Container (Full width container with 20px internal content margins) */
 .page-container {
   width: 100%;
-  padding: 16px var(--page-padding-x) 92px var(--page-padding-x);
+  max-width: 100%;
+  padding: 16px var(--page-padding-x) calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 24px) var(--page-padding-x);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -137,9 +135,11 @@ body {
 
 /* Shared Header Component */
 .app-header {
-  height: var(--header-height);
-  min-height: var(--header-height);
-  padding: 0 var(--page-padding-x);
+  height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+  min-height: calc(var(--header-height) + env(safe-area-inset-top, 0px));
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-left: var(--page-padding-x);
+  padding-right: var(--page-padding-x);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -400,6 +400,7 @@ textarea.input-control {
   bottom: 0;
   left: 0;
   right: 0;
+  width: 100%;
   height: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px));
   padding-bottom: env(safe-area-inset-bottom, 0px);
   background: var(--bg-card);
@@ -407,8 +408,8 @@ textarea.input-control {
   display: flex;
   justify-content: space-around;
   align-items: center;
-  padding-left: 6px;
-  padding-right: 6px;
+  padding-left: 4px;
+  padding-right: 4px;
   z-index: 50;
   box-shadow: 0 -4px 12px rgba(15, 23, 42, 0.05);
 }
