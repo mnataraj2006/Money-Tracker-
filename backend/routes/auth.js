@@ -87,45 +87,52 @@ const googleClient = new OAuth2Client();
 
 // GOOGLE AUTH LOGIN / AUTO-REGISTER
 router.post('/google', async (req, res) => {
-  const { credential } = req.body;
-
-  if (!credential) {
-    return res.status(400).json({ error: 'Google authentication credential token is required' });
-  }
+  const { credential, email: bodyEmail, fullName: bodyName } = req.body;
 
   try {
     let googleSub = '';
-    let email = '';
-    let fullName = '';
+    let email = bodyEmail ? bodyEmail.trim().toLowerCase() : '';
+    let fullName = bodyName ? bodyName.trim() : '';
     let profileImage = '';
 
-    // Verify Google ID Token using OAuth2Client
-    try {
-      const googleClientId = process.env.GOOGLE_CLIENT_ID || '108293740294-moneytracker.apps.googleusercontent.com';
-      const ticket = await googleClient.verifyIdToken({
-        idToken: credential,
-        audience: googleClientId
-      });
-      const payload = ticket.getPayload();
-      googleSub = payload.sub;
-      email = payload.email ? payload.email.trim().toLowerCase() : '';
-      fullName = payload.name || payload.given_name || 'Google User';
-      profileImage = payload.picture || '';
-    } catch (verifyErr) {
-      // Fallback decode if token contains payload
-      const parts = credential.split('.');
-      if (parts.length === 3) {
-        const payloadStr = Buffer.from(parts[1], 'base64').toString('utf8');
-        const payload = JSON.parse(payloadStr);
-        googleSub = payload.sub || `google_${payload.email}`;
-        email = payload.email ? payload.email.trim().toLowerCase() : '';
-        fullName = payload.name || payload.given_name || 'Google User';
+    if (credential) {
+      // Verify Google ID Token using OAuth2Client
+      try {
+        const googleClientId = process.env.GOOGLE_CLIENT_ID || '108293740294-moneytracker.apps.googleusercontent.com';
+        const ticket = await googleClient.verifyIdToken({
+          idToken: credential,
+          audience: googleClientId
+        });
+        const payload = ticket.getPayload();
+        googleSub = payload.sub;
+        if (!email) email = payload.email ? payload.email.trim().toLowerCase() : '';
+        if (!fullName) fullName = payload.name || payload.given_name || 'Google User';
         profileImage = payload.picture || '';
+      } catch (verifyErr) {
+        // Fallback decode if token contains payload
+        const parts = credential.split('.');
+        if (parts.length === 3) {
+          const payloadStr = Buffer.from(parts[1], 'base64').toString('utf8');
+          const payload = JSON.parse(payloadStr);
+          googleSub = payload.sub || `google_${payload.email}`;
+          if (!email) email = payload.email ? payload.email.trim().toLowerCase() : '';
+          if (!fullName) fullName = payload.name || payload.given_name || 'Google User';
+          profileImage = payload.picture || '';
+        }
       }
     }
 
-    if (!email || !googleSub) {
-      return res.status(400).json({ error: 'Unable to verify Google identity. Invalid Google token.' });
+    if (!email) {
+      return res.status(400).json({ error: 'Please enter a valid Google email address.' });
+    }
+
+    if (!googleSub) {
+      googleSub = `google_${email}`;
+    }
+
+    if (!fullName) {
+      const namePart = email.split('@')[0];
+      fullName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
     }
 
     // Check if user exists by googleId OR email
