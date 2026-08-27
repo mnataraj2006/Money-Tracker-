@@ -30,7 +30,14 @@ export default function HistoryScreen({ user, onNavigate }) {
   const { t, language } = useLanguage();
   const { cache, updateCache } = useDataCache();
 
-  const [currentMonth, setCurrentMonth] = useState('2026-08');
+  const getCurrentMonthStr = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    return `${y}-${m}`;
+  };
+
+  const [currentMonth, setCurrentMonth] = useState(getCurrentMonthStr);
   const [history, setHistory] = useState(cache.history?.history || []);
   const [monthlySummary, setMonthlySummary] = useState(cache.history?.monthlySummary || null);
   const [cashData, setCashData] = useState(cache.history?.cashData || null);
@@ -75,16 +82,24 @@ export default function HistoryScreen({ user, onNavigate }) {
   };
 
   const handlePrevMonth = () => {
-    const [y, m] = currentMonth.split('-').map(Number);
-    const prevDate = new Date(y, m - 2, 1);
-    const formatted = prevDate.toISOString().substring(0, 7);
+    let [y, m] = currentMonth.split('-').map(Number);
+    m -= 1;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    }
+    const formatted = `${y}-${String(m).padStart(2, '0')}`;
     setCurrentMonth(formatted);
   };
 
   const handleNextMonth = () => {
-    const [y, m] = currentMonth.split('-').map(Number);
-    const nextDate = new Date(y, m, 1);
-    const formatted = nextDate.toISOString().substring(0, 7);
+    let [y, m] = currentMonth.split('-').map(Number);
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+    const formatted = `${y}-${String(m).padStart(2, '0')}`;
     setCurrentMonth(formatted);
   };
 
@@ -98,8 +113,10 @@ export default function HistoryScreen({ user, onNavigate }) {
 
   const monthLabel = () => {
     const [y, m] = currentMonth.split('-').map(Number);
-    const dateObj = new Date(y, m - 1, 1);
-    return dateObj.toLocaleString(language === 'ta' ? 'ta-IN' : 'en-US', { month: 'long', year: 'numeric' });
+    const monthsEn = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthsTa = ['ஜனவரி', 'பிப்ரவரி', 'மார்ச்', 'ஏப்ரல்', 'மே', 'ஜூன்', 'ஜூலை', 'ஆகஸ்ட்', 'செப்டம்பர்', 'அக்டோபர்', 'நவம்பர்', 'டிசம்பர்'];
+    const monthName = language === 'ta' ? monthsTa[m - 1] : monthsEn[m - 1];
+    return `${monthName} ${y}`;
   };
 
   const formatDayDate = (dateStr) => {
