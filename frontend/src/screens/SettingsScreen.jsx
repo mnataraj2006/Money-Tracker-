@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Bell, User, Lock, LogOut, RefreshCw, Grid, Moon, Database, ChevronRight, Globe, Check } from 'lucide-react';
-import { authAPI } from '../services/api';
+import { Bell, User, Lock, LogOut, RefreshCw, Grid, Moon, Database, ChevronRight, Globe, Check, Download, Upload } from 'lucide-react';
+import { authAPI, settingsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function SettingsScreen({ user, onLogout }) {
@@ -12,6 +12,56 @@ export default function SettingsScreen({ user, onLogout }) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [passwordMsg, setPasswordMsg] = useState('');
+
+  const [backupStatus, setBackupStatus] = useState('');
+  const [backupLoading, setBackupLoading] = useState(false);
+
+  const handleExportBackup = async () => {
+    try {
+      setBackupLoading(true);
+      setBackupStatus('Generating backup...');
+      const data = await settingsAPI.exportBackup();
+      const jsonStr = JSON.stringify(data, null, 2);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `MoneyTracker_Backup_${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setBackupStatus('Backup exported successfully!');
+    } catch (err) {
+      console.error('Backup export error:', err);
+      setBackupStatus('Failed to export backup.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
+
+  const handleRestoreBackup = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      setBackupLoading(true);
+      setBackupStatus('Restoring backup...');
+      const text = await file.text();
+      const backupData = JSON.parse(text);
+
+      await settingsAPI.restoreBackup(backupData);
+      setBackupStatus('Backup restored successfully! Reloading...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 1200);
+    } catch (err) {
+      console.error('Restore error:', err);
+      setBackupStatus('Invalid backup file or restore failed.');
+    } finally {
+      setBackupLoading(false);
+    }
+  };
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
@@ -143,11 +193,39 @@ export default function SettingsScreen({ user, onLogout }) {
           <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{t('lightSystemDefault')}</div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-main)', fontWeight: '600' }}>
-            <Database size={18} color="var(--text-secondary)" /> {t('dataBackup')}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '14px 0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-main)', fontWeight: '600' }}>
+              <Database size={18} color="var(--navy-primary)" /> {t('dataBackup')} / Cloud
+            </div>
+            <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+              {backupStatus || 'JSON / Google Drive'}
+            </div>
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{t('lastBackup')}</div>
+
+          <div style={{ display: 'flex', gap: '8px', marginTop: '4px' }}>
+            <button
+              className="btn-outline-navy"
+              onClick={handleExportBackup}
+              disabled={backupLoading}
+              style={{ flex: 1, padding: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+            >
+              <Download size={14} /> Export Backup
+            </button>
+
+            <label
+              className="btn-primary-navy"
+              style={{ flex: 1, padding: '8px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', cursor: 'pointer', textAlign: 'center' }}
+            >
+              <Upload size={14} /> Restore Backup
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleRestoreBackup}
+                style={{ display: 'none' }}
+              />
+            </label>
+          </div>
         </div>
       </div>
 

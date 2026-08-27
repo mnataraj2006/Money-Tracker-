@@ -68,5 +68,7 @@ export const summaryAPI = {
 // SETTINGS API
 export const settingsAPI = {
   get: () => request('/settings'),
-  update: (settingsData) => request('/settings', { method: 'PUT', body: JSON.stringify(settingsData) })
+  update: (settingsData) => request('/settings', { method: 'PUT', body: JSON.stringify(settingsData) }),
+  exportBackup: () => request('/settings/export'),
+  restoreBackup: (backupData) => request('/settings/restore', { method: 'POST', body: JSON.stringify({ backupData }) })
 };
