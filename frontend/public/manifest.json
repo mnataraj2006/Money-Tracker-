@@ -1,0 +1,16 @@
+{
+  "short_name": "Money Tracker",
+  "name": "Money Tracker - Daily Cash & Expense Manager",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#F4F6F9",
+  "theme_color": "#16247B",
+  "display": "standalone",
+  "orientation": "portrait"
+}
