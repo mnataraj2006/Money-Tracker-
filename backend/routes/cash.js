@@ -118,11 +118,19 @@ router.get('/expected', authenticateToken, async (req, res) => {
     const countRow = await CashCount.findOne({ userId, date: targetDate }).sort({ createdAt: -1 });
     const closingRow = await DailyClosing.findOne({ userId, date: targetDate });
 
-    let physicalCash = countRow ? countRow.physicalCash : (closingRow ? closingRow.physicalCash : null);
-    let difference = physicalCash !== null ? physicalCash - expectedCash : null;
-    let status = 'UNCHECKED';
+    let physicalCash;
+    if (countRow) {
+      physicalCash = countRow.physicalCash;
+    } else if (closingRow && closingRow.isClosed && closingRow.physicalCash !== undefined && closingRow.physicalCash !== null) {
+      physicalCash = closingRow.physicalCash;
+    } else {
+      physicalCash = expectedCash;
+    }
 
-    if (physicalCash !== null) {
+    let difference = physicalCash - expectedCash;
+    let status = 'TALLIED';
+
+    if (countRow || (closingRow && closingRow.isClosed)) {
       if (difference === 0) status = 'TALLIED';
       else if (difference < 0) status = 'SHORT';
       else status = 'EXTRA';
@@ -173,7 +181,16 @@ async function recalculateDailyClosingsFrom(userId, startDate) {
 
       const expectedClosingCash = openingCash + cashIncome - cashExpense;
       const countRow = await CashCount.findOne({ userId, date: closing.date }).sort({ createdAt: -1 });
-      const physicalCash = countRow ? countRow.physicalCash : expectedClosingCash;
+
+      let physicalCash;
+      if (countRow) {
+        physicalCash = countRow.physicalCash;
+      } else if (closing.isClosed && closing.physicalCash !== undefined && closing.physicalCash !== null) {
+        physicalCash = closing.physicalCash;
+      } else {
+        physicalCash = expectedClosingCash;
+      }
+
       const difference = physicalCash - expectedClosingCash;
 
       let status = 'TALLIED';

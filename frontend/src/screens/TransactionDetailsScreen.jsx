@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Edit, Trash2, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
+import { useDataCache } from '../context/DataContext';
 
 export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
+  const { clearCache } = useDataCache();
   const [tx, setTx] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -27,6 +29,7 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
     if (!window.confirm('Are you sure you want to delete this transaction?')) return;
     try {
       await transactionsAPI.delete(txId);
+      clearCache();
       onBack();
     } catch (err) {
       alert(err.message || 'Failed to delete transaction');

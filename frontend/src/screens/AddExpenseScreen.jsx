@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Bell, Save } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
+import { useDataCache } from '../context/DataContext';
 
 export default function AddExpenseScreen({ onBack, onSuccess, initialDate }) {
+  const { clearCache } = useDataCache();
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Groceries');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
@@ -31,6 +33,7 @@ export default function AddExpenseScreen({ onBack, onSuccess, initialDate }) {
         description: note,
         date
       });
+      clearCache();
       onSuccess();
     } catch (err) {
       setError(err.message || 'Failed to save expense transaction');

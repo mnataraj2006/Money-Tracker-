@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { ArrowLeft, Bell, Save, Calendar } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
+import { useDataCache } from '../context/DataContext';
 
 export default function AddIncomeScreen({ onBack, onSuccess, initialDate }) {
+  const { clearCache } = useDataCache();
   const [amount, setAmount] = useState('');
   const [category, setCategory] = useState('Salary');
   const [paymentMethod, setPaymentMethod] = useState('CASH');
@@ -31,6 +33,7 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate }) {
         description: note,
         date
       });
+      clearCache();
       onSuccess();
     } catch (err) {
       setError(err.message || 'Failed to save income transaction');
