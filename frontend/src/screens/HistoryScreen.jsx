@@ -22,14 +22,17 @@ import {
 } from 'lucide-react';
 import { summaryAPI, cashAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import { useDataCache } from '../context/DataContext';
 
 export default function HistoryScreen({ user, onNavigate }) {
   const { t, language } = useLanguage();
+  const { cache, updateCache } = useDataCache();
+
   const [currentMonth, setCurrentMonth] = useState('2026-08');
-  const [history, setHistory] = useState([]);
-  const [monthlySummary, setMonthlySummary] = useState(null);
-  const [cashData, setCashData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [history, setHistory] = useState(cache.history?.history || []);
+  const [monthlySummary, setMonthlySummary] = useState(cache.history?.monthlySummary || null);
+  const [cashData, setCashData] = useState(cache.history?.cashData || null);
+  const [loading, setLoading] = useState(!cache.history);
   const [error, setError] = useState(null);
 
   // Selected Day Detail State
@@ -46,7 +49,7 @@ export default function HistoryScreen({ user, onNavigate }) {
 
   const loadHistoryAndSummary = async () => {
     try {
-      setLoading(true);
+      if (!cache.history) setLoading(true);
       setError(null);
       const [histRes, sumRes, cashRes] = await Promise.all([
         summaryAPI.getHistory(currentMonth),
@@ -56,6 +59,11 @@ export default function HistoryScreen({ user, onNavigate }) {
       setHistory(histRes.history || []);
       setMonthlySummary(sumRes);
       setCashData(cashRes);
+      updateCache('history', {
+        history: histRes.history || [],
+        monthlySummary: sumRes,
+        cashData: cashRes
+      });
     } catch (err) {
       console.error('Failed to load month-wise history:', err);
       setError(t('unableToLoadHistory'));

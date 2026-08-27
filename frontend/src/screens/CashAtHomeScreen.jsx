@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, ArrowDown, ArrowUp, CheckCircle, Calculator, Moon } from 'lucide-react';
 import { cashAPI } from '../services/api';
+import { useDataCache } from '../context/DataContext';
 
 export default function CashAtHomeScreen({ user, onNavigate }) {
-  const [cashData, setCashData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { cache, updateCache } = useDataCache();
+  const [cashData, setCashData] = useState(cache.cash || null);
+  const [loading, setLoading] = useState(!cache.cash);
 
   useEffect(() => {
     loadCashData();
@@ -12,10 +14,11 @@ export default function CashAtHomeScreen({ user, onNavigate }) {
 
   const loadCashData = async () => {
     try {
-      setLoading(true);
+      if (!cache.cash) setLoading(true);
       const today = new Date().toISOString().split('T')[0];
       const res = await cashAPI.getExpected(today);
       setCashData(res);
+      updateCache('cash', res);
     } catch (err) {
       console.error('Failed to load cash data:', err);
     } finally {

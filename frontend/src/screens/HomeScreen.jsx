@@ -2,12 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Minus, ArrowDown, ArrowUp, CheckCircle, AlertTriangle, ChevronRight, ShoppingBag, Coffee, Briefcase, Utensils, Landmark, Smartphone, CreditCard } from 'lucide-react';
 import { summaryAPI, cashAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import { useDataCache } from '../context/DataContext';
 
 export default function HomeScreen({ user, onNavigate }) {
   const { t, language } = useLanguage();
-  const [data, setData] = useState(null);
-  const [cashData, setCashData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { cache, updateCache } = useDataCache();
+
+  const [data, setData] = useState(cache.dashboard || null);
+  const [cashData, setCashData] = useState(cache.cash || null);
+  const [loading, setLoading] = useState(!cache.dashboard);
 
   useEffect(() => {
     loadData();
@@ -15,12 +18,16 @@ export default function HomeScreen({ user, onNavigate }) {
 
   const loadData = async () => {
     try {
-      setLoading(true);
+      if (!cache.dashboard) setLoading(true);
       const today = new Date().toISOString().split('T')[0];
-      const dash = await summaryAPI.getDashboard(today);
-      const cash = await cashAPI.getExpected(today);
+      const [dash, cash] = await Promise.all([
+        summaryAPI.getDashboard(today),
+        cashAPI.getExpected(today)
+      ]);
       setData(dash);
       setCashData(cash);
+      updateCache('dashboard', dash);
+      updateCache('cash', cash);
     } catch (err) {
       console.error('Failed to load dashboard:', err);
     } finally {

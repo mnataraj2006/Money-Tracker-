@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Bell, Filter, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard, Plus } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
+import { useDataCache } from '../context/DataContext';
 
 export default function TransactionsScreen({ onNavigate, user }) {
-  const [transactions, setTransactions] = useState([]);
+  const { cache, updateCache } = useDataCache();
+  const [transactions, setTransactions] = useState(cache.transactions || []);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cache.transactions);
 
   useEffect(() => {
     loadTransactions();
@@ -14,13 +16,17 @@ export default function TransactionsScreen({ onNavigate, user }) {
 
   const loadTransactions = async () => {
     try {
-      setLoading(true);
+      if (!cache.transactions && !search.trim() && typeFilter === 'ALL') setLoading(true);
       const params = {};
       if (typeFilter !== 'ALL') params.type = typeFilter;
       if (search.trim()) params.search = search.trim();
 
       const data = await transactionsAPI.getAll(params);
-      setTransactions(data.transactions || []);
+      const txs = data.transactions || [];
+      setTransactions(txs);
+      if (typeFilter === 'ALL' && !search.trim()) {
+        updateCache('transactions', txs);
+      }
     } catch (err) {
       console.error('Failed to load transactions:', err);
     } finally {

@@ -19,6 +19,7 @@ import SettingsScreen from './screens/SettingsScreen';
 import DailyDetailsScreen from './screens/DailyDetailsScreen';
 import { authAPI } from './services/api';
 import { LanguageProvider } from './context/LanguageContext';
+import { DataProvider } from './context/DataContext';
 
 function AppContent() {
   const [user, setUser] = useState(null);
@@ -207,7 +208,9 @@ function AppContent() {
 export default function App() {
   return (
     <LanguageProvider>
-      <AppContent />
+      <DataProvider>
+        <AppContent />
+      </DataProvider>
     </LanguageProvider>
   );
 }
