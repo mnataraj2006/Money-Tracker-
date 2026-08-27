@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { Search, Bell, Filter, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard, Plus } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
-
+import { useLanguage } from '../context/LanguageContext';
 import PageContainer from '../components/PageContainer';
 
 export default function TransactionsScreen({ onNavigate, user }) {
+  const { t } = useLanguage();
   const { cache, updateCache } = useDataCache();
   const [transactions, setTransactions] = useState(cache.transactions || []);
   const [search, setSearch] = useState('');
@@ -57,7 +58,7 @@ export default function TransactionsScreen({ onNavigate, user }) {
 
   return (
     <PageContainer>
-      <h1 className="page-title">Transactions</h1>
+      <h1 className="page-title">{t('transactions')}</h1>
 
       {/* Search Input */}
       <div className="input-field-wrapper">
@@ -65,7 +66,7 @@ export default function TransactionsScreen({ onNavigate, user }) {
         <input
           type="text"
           className="input-control has-prefix"
-          placeholder="Search transactions..."
+          placeholder={t('searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -87,7 +88,7 @@ export default function TransactionsScreen({ onNavigate, user }) {
             boxShadow: 'var(--shadow-sm)'
           }}
         >
-          All
+          {t('all')}
         </button>
 
         <button
@@ -104,7 +105,7 @@ export default function TransactionsScreen({ onNavigate, user }) {
             boxShadow: 'var(--shadow-sm)'
           }}
         >
-          Income
+          {t('income')}
         </button>
 
         <button
@@ -121,14 +122,14 @@ export default function TransactionsScreen({ onNavigate, user }) {
             boxShadow: 'var(--shadow-sm)'
           }}
         >
-          Expense
+          {t('expense')}
         </button>
       </div>
 
       {/* Grouped Transaction Lists */}
       {Object.keys(grouped).length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
-          No transactions found.
+          {t('noTransactionsFound')}
         </div>
       ) : (
         Object.keys(grouped).map((dateStr) => {

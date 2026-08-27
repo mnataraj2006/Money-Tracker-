@@ -52,10 +52,17 @@ export const translations = {
     noTransactionsFound: 'No transactions found.',
 
     // Cash Screen
+    cashAtHome: 'Cash at Home',
     expectedCash: 'Expected Cash',
+    previousDayCash: 'Previous Day Cash',
+    todayCashIncome: 'Today Cash Income',
+    todayCashExpense: 'Today Cash Expense',
+    expectedClosingCashAtHome: 'Expected Cash at Home',
+    lastCheckToday: 'Last check: Today',
     lastCounted: 'Last Counted',
     startCashCount: 'Start Cash Count',
     closeDay: 'Close Day',
+    dailyClosing: 'Daily Closing',
 
     // History Screen Redesign
     monthlyOverview: 'Monthly Overview',
@@ -64,7 +71,6 @@ export const translations = {
     totalExpense: 'Total Expense',
     netSavings: 'Net Savings',
     net: 'Net',
-    cashAtHome: 'Cash at Home',
     currentCashAtHome: 'Current Cash at Home',
     dailyRecords: 'Daily Records',
     viewDetails: 'View Details',
@@ -98,7 +104,7 @@ export const translations = {
     // Navigation
     appTitle: 'பணக் கண்காணிப்பு',
     home: 'முகப்பு',
-    transactions: 'பரிவர்த்தனை',
+    transactions: 'பரிவர்த்தனைகள்',
     cash: 'ரொக்கம்',
     history: 'வரலாறு',
     settings: 'அமைப்புகள்',
@@ -147,10 +153,17 @@ export const translations = {
     noTransactionsFound: 'பரிவர்த்தனைகள் எதுவும் இல்லை.',
 
     // Cash Screen
+    cashAtHome: 'வீட்டில் உள்ள ரொக்கம்',
     expectedCash: 'எதிர்பார்க்கப்படும் ரொக்கம்',
+    previousDayCash: 'நேற்றைய ரொக்கம்',
+    todayCashIncome: 'இன்றைய ரொக்க வருமானம்',
+    todayCashExpense: 'இன்றைய ரொக்கச் செலவு',
+    expectedClosingCashAtHome: 'எதிர்பார்க்கப்படும் வீட்டு ரொக்கம்',
+    lastCheckToday: 'கடைசி சரிபார்ப்பு: இன்று',
     lastCounted: 'கடைசியாக எண்ணியது',
     startCashCount: 'ரொக்கம் எண்ணத் தொடங்கவும்',
     closeDay: 'நாளை முடிவெடு',
+    dailyClosing: 'தினசரி முடிவு',
 
     // History Screen Redesign
     monthlyOverview: 'மாதாந்திர மேலோட்டம்',
@@ -159,7 +172,6 @@ export const translations = {
     totalExpense: 'மொத்த செலவு',
     netSavings: 'நிகர சேமிப்பு',
     net: 'நிகரம்',
-    cashAtHome: 'வீட்டில் உள்ள ரொக்கம்',
     currentCashAtHome: 'தற்போதைய வீட்டு ரொக்கம்',
     dailyRecords: 'தினசரி பதிவுகள்',
     viewDetails: 'விவரங்களைக் காண்க',
