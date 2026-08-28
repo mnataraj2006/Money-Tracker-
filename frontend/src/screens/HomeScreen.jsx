@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, ArrowDown, ArrowUp, CheckCircle, AlertTriangle, ChevronRight, ShoppingBag, Coffee, Briefcase, Utensils, Landmark, Smartphone, CreditCard } from 'lucide-react';
-import { summaryAPI, cashAPI } from '../services/api';
+import { Plus, Minus, ArrowDown, ArrowUp, CheckCircle, AlertTriangle, ChevronRight, ShoppingBag, Coffee, Briefcase, Utensils, CreditCard, RotateCcw, Landmark } from 'lucide-react';
+import { summaryAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useDataCache } from '../context/DataContext';
 
@@ -11,8 +11,8 @@ export default function HomeScreen({ user, onNavigate }) {
   const { cache, updateCache } = useDataCache();
 
   const [data, setData] = useState(cache.dashboard || null);
-  const [cashData, setCashData] = useState(cache.cash || null);
   const [loading, setLoading] = useState(!cache.dashboard);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -21,154 +21,381 @@ export default function HomeScreen({ user, onNavigate }) {
   const loadData = async () => {
     try {
       if (!cache.dashboard) setLoading(true);
+      setError(false);
       const today = new Date().toISOString().split('T')[0];
       const dash = await summaryAPI.getDashboard(today);
       setData(dash);
-      setCashData(dash);
       updateCache('dashboard', dash);
-      updateCache('cash', dash);
     } catch (err) {
-      console.error('Failed to load dashboard:', err);
+      console.error('Failed to load dashboard summary:', err);
+      setError(true);
     } finally {
       setLoading(false);
     }
   };
 
   const formatCurrency = (val) => {
-    const num = val || 0;
+    const num = Math.abs(val || 0);
     return `₹${num.toLocaleString('en-IN')}`;
   };
 
-  const getCategoryIcon = (category) => {
-    const cat = (category || '').toLowerCase();
-    if (cat.includes('salary') || cat.includes('income')) return <Briefcase size={18} color="#16A34A" />;
-    if (cat.includes('food') || cat.includes('breakfast')) return <Utensils size={18} color="#DC2626" />;
-    if (cat.includes('grocery') || cat.includes('shopping')) return <ShoppingBag size={18} color="#DC2626" />;
-    if (cat.includes('coffee')) return <Coffee size={18} color="#DC2626" />;
-    return <CreditCard size={18} color="var(--navy-primary)" />;
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour >= 5 && hour < 12) return 'Good morning 👋';
+    if (hour >= 12 && hour < 17) return 'Good afternoon 👋';
+    return 'Good evening 👋';
   };
-
-  const firstName = user?.fullName ? user.fullName.split(' ')[0] : 'Alex';
-  const expectedCash = cashData?.expectedCash ?? 0;
-  const status = cashData?.status || 'TALLIED';
 
   const getFormattedTodayDate = () => {
     const d = new Date();
     return d.toLocaleDateString(language === 'ta' ? 'ta-IN' : 'en-US', {
+      weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric'
     });
   };
 
-  return (
-    <PageContainer>
-      {/* Welcome Subheader */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>
-          {getFormattedTodayDate()}
-        </div>
-        <h1 className="page-title" style={{ fontSize: '20px' }}>
-          {t('welcomeBack')}, {firstName}
-        </h1>
-      </div>
+  const getCategoryIcon = (category) => {
+    const cat = (category || '').toLowerCase();
+    if (cat.includes('salary') || cat.includes('income')) return <Briefcase size={18} color="#16A34A" />;
+    if (cat.includes('food') || cat.includes('breakfast') || cat.includes('lunch') || cat.includes('dinner')) return <Utensils size={18} color="#DC2626" />;
+    if (cat.includes('grocery') || cat.includes('shopping')) return <ShoppingBag size={18} color="#DC2626" />;
+    if (cat.includes('coffee') || cat.includes('tea')) return <Coffee size={18} color="#DC2626" />;
+    if (cat.includes('bank') || cat.includes('transfer')) return <Landmark size={18} color="#16247B" />;
+    return <CreditCard size={18} color="#16247B" />;
+  };
 
-      {/* Main Navy Expected Cash Card */}
-      <div className="navy-card">
-        <div className="navy-card-label">{t('physicalCashAtHome')}</div>
-        <div className="navy-card-amount">{formatCurrency(expectedCash)}</div>
+  // Extract Cash & Count Status
+  const expectedCash = data?.expectedCash ?? 0;
+  const physicalCash = data?.physicalCash;
+  const difference = data?.difference ?? 0;
+  
+  // Determine whether cash has been counted today
+  const hasCounted = data?.hasCounted ?? (data?.counts !== null && data?.counts !== undefined);
+  const status = hasCounted ? (data?.status || 'TALLIED') : 'NOT_COUNTED';
 
-        <div style={{ fontSize: '12px', opacity: 0.85, marginTop: '-4px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
-          Opening Cash (Yesterday): <span style={{ fontWeight: '800' }}>{formatCurrency(data?.previousDayCash ?? 0)}</span>
-        </div>
+  // Render Tally Badge & Guidance
+  const renderTallyStatus = () => {
+    if (!hasCounted) {
+      return {
+        badgeClass: 'not-counted',
+        badgeStyle: { background: '#F1F5F9', color: '#475569' },
+        badgeText: '○ NOT COUNTED',
+        guidanceText: 'Daily cash check pending',
+        showCountButton: true
+      };
+    }
 
-        <div className="navy-card-footer">
-          <div className={`badge-pill ${status.toLowerCase()}`}>
-            <CheckCircle size={12} />
-            <span>✓ {status}</span>
+    if (status === 'SHORT' || difference < 0) {
+      return {
+        badgeClass: 'short',
+        badgeStyle: { background: '#FEE2E2', color: '#B91C1C' },
+        badgeText: '⚠ CASH SHORT',
+        guidanceText: `⚠ Cash is short by ${formatCurrency(difference)}`,
+        showCountButton: false
+      };
+    }
+
+    if (status === 'EXTRA' || difference > 0) {
+      return {
+        badgeClass: 'extra',
+        badgeStyle: { background: '#FEF3C7', color: '#B45309' },
+        badgeText: '⚠ CASH EXTRA',
+        guidanceText: `⚠ Cash is extra by ${formatCurrency(difference)}`,
+        showCountButton: false
+      };
+    }
+
+    return {
+      badgeClass: 'tallied',
+      badgeStyle: { background: '#DCFCE7', color: '#15803D' },
+      badgeText: '✓ TALLIED',
+      guidanceText: '✓ Cash is tallied',
+      showCountButton: false
+    };
+  };
+
+  const tallyInfo = renderTallyStatus();
+
+  // Skeleton Loader Component
+  if (loading && !data) {
+    return (
+      <PageContainer>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          {/* Header Skeleton */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ width: '140px', height: '22px', background: '#E2E8F0', borderRadius: '6px', animation: 'pulse 1.5s infinite' }}></div>
+            <div style={{ width: '180px', height: '14px', background: '#F1F5F9', borderRadius: '4px' }}></div>
           </div>
 
+          {/* Today Summary Skeleton */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div className="stitch-card" style={{ height: '90px', background: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '10px' }}>
+              <div style={{ width: '60px', height: '12px', background: '#E2E8F0', borderRadius: '4px' }}></div>
+              <div style={{ width: '90px', height: '24px', background: '#DCFCE7', borderRadius: '6px' }}></div>
+            </div>
+            <div className="stitch-card" style={{ height: '90px', background: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '10px' }}>
+              <div style={{ width: '60px', height: '12px', background: '#E2E8F0', borderRadius: '4px' }}></div>
+              <div style={{ width: '90px', height: '24px', background: '#FEE2E2', borderRadius: '6px' }}></div>
+            </div>
+          </div>
+
+          {/* Cash At Home Card Skeleton */}
+          <div className="navy-card" style={{ height: '180px', opacity: 0.85 }}></div>
+
+          {/* Quick Actions Skeleton */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <div style={{ height: '52px', background: '#E2E8F0', borderRadius: '12px' }}></div>
+            <div style={{ height: '52px', background: '#E2E8F0', borderRadius: '12px' }}></div>
+          </div>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  // Error State Component
+  if (error && !data) {
+    return (
+      <PageContainer>
+        <div className="stitch-card" style={{ padding: '32px 20px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', marginTop: '40px' }}>
+          <AlertTriangle size={36} color="#DC2626" />
+          <div>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>Unable to load today's data</h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>Please check your network connection and try again.</p>
+          </div>
+          <button className="btn-primary-navy" onClick={loadData} style={{ width: 'auto', padding: '0 24px' }}>
+            <RotateCcw size={16} /> Retry
+          </button>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  return (
+    <PageContainer>
+      {/* 1. Header (Greeting & Date) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>
+          {getGreeting()}
+        </h1>
+        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+          {getFormattedTodayDate()}
+        </div>
+      </div>
+
+      {/* 2. Today's Summary (Equal Income & Expense Cards, NO Net Today) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+          Today's Summary
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+          {/* Income Card */}
+          <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--green-income)', fontWeight: '700', textTransform: 'uppercase' }}>
+              <ArrowDown size={14} /> {t('income')}
+            </div>
+            <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--green-income)', letterSpacing: '-0.3px' }}>
+              {formatCurrency(data?.todayIncome)}
+            </div>
+          </div>
+
+          {/* Expense Card */}
+          <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '6px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--red-expense)', fontWeight: '700', textTransform: 'uppercase' }}>
+              <ArrowUp size={14} /> {t('expense')}
+            </div>
+            <div style={{ fontSize: '22px', fontWeight: '800', color: 'var(--red-expense)', letterSpacing: '-0.3px' }}>
+              {formatCurrency(data?.todayExpense)}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Cash At Home (Most Important Section) */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+          💵 Cash At Home
+        </div>
+
+        <div className="navy-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          {/* Expected & Physical Cash Rows */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', opacity: 0.85, fontWeight: '600' }}>Expected Cash</span>
+              <span style={{ fontSize: '18px', fontWeight: '800', color: '#FFFFFF' }}>{formatCurrency(expectedCash)}</span>
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ fontSize: '13px', opacity: 0.85, fontWeight: '600' }}>Physical Cash</span>
+              <span style={{ fontSize: '18px', fontWeight: '800', color: hasCounted ? '#FFFFFF' : '#CBD5E1' }}>
+                {hasCounted ? formatCurrency(physicalCash) : 'Not counted'}
+              </span>
+            </div>
+
+            {/* Show Difference row if Short or Extra */}
+            {hasCounted && difference !== 0 && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '4px', borderTop: '1px dashed rgba(255,255,255,0.2)' }}>
+                <span style={{ fontSize: '13px', opacity: 0.85, fontWeight: '600' }}>Difference</span>
+                <span style={{ fontSize: '16px', fontWeight: '800', color: difference < 0 ? '#FCA5A5' : '#FDE047' }}>
+                  {difference > 0 ? '+' : '-'}{formatCurrency(difference)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Tally Status Badge & Guidance Footer */}
+          <div style={{ paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.15)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="badge-pill" style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '700', borderRadius: '20px', ...tallyInfo.badgeStyle }}>
+              {tallyInfo.badgeText}
+            </div>
+
+            <div style={{ fontSize: '12px', opacity: 0.9, fontWeight: '600' }}>
+              {tallyInfo.guidanceText}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 4. Quick Actions */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+          Quick Actions
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {/* Row 1: Add Income & Add Expense */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <button
+              onClick={() => onNavigate('add-income')}
+              style={{
+                height: '52px',
+                background: '#16A34A',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '15px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(22, 163, 74, 0.25)'
+              }}
+            >
+              <Plus size={18} /> {t('addIncome')}
+            </button>
+
+            <button
+              onClick={() => onNavigate('add-expense')}
+              style={{
+                height: '52px',
+                background: '#DC2626',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '15px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(220, 38, 38, 0.25)'
+              }}
+            >
+              <Minus size={18} /> {t('addExpense')}
+            </button>
+          </div>
+
+          {/* Row 2: Count Cash */}
           <button
+            className="btn-primary-navy"
             onClick={() => onNavigate('cash')}
             style={{
-              background: 'none',
-              border: 'none',
-              color: '#FFFFFF',
-              fontSize: '13px',
-              fontWeight: '700',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '4px'
+              height: '52px',
+              borderRadius: '12px',
+              fontSize: '15px',
+              fontWeight: '700'
             }}
           >
-            {t('countCash')} <ChevronRight size={14} />
+            💵 {t('countCash')}
           </button>
         </div>
       </div>
 
-      {/* Income & Expense Summary Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <div className="stitch-card" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--green-income)', fontWeight: '700' }}>
-            <ArrowDown size={14} /> {t('income')}
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--green-income)' }}>
-            {formatCurrency(data?.todayIncome ?? 0)}
-          </div>
-        </div>
-
-        <div className="stitch-card" style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', color: 'var(--red-expense)', fontWeight: '700' }}>
-            <ArrowUp size={14} /> {t('expense')}
-          </div>
-          <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--red-expense)' }}>
-            {formatCurrency(data?.todayExpense ?? 0)}
-          </div>
-        </div>
-      </div>
-
-      {/* Today's Balance Card */}
-      <div className="stitch-card" style={{ padding: '14px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>{t('netBalance')}</div>
-          <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)', marginTop: '2px' }}>
-            {formatCurrency(data?.todayBalance ?? 0)}
-          </div>
-        </div>
-      </div>
-
-      {/* Primary Action Buttons */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-        <button className="btn-primary-navy" onClick={() => onNavigate('add-income')}>
-          <Plus size={18} /> {t('addIncome')}
-        </button>
-        <button className="btn-outline-navy" onClick={() => onNavigate('add-expense')}>
-          <Minus size={18} /> {t('addExpense')}
-        </button>
-      </div>
-
-      {/* Recent Transactions */}
-      <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+      {/* 5. Recent Transactions */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <span style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)' }}>
+          <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
             {t('todaysTransactions')}
           </span>
           <span
             onClick={() => onNavigate('transactions')}
-            style={{ fontSize: '12px', fontWeight: '700', color: 'var(--navy-primary)', cursor: 'pointer' }}
+            style={{ fontSize: '13px', fontWeight: '700', color: 'var(--navy-primary)', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
           >
-            {t('viewAll')}
+            {t('viewAll')} <ChevronRight size={16} />
           </span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
           {!data?.recentTransactions || data.recentTransactions.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-muted)', fontSize: '13px' }}>
-              {t('noTransactionsToday')}
+            /* Empty State */
+            <div className="stitch-card" style={{ padding: '24px 16px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <ShoppingBag size={22} color="var(--text-secondary)" />
+              </div>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>No transactions today</div>
+                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>Start by adding your first income or expense.</div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', width: '100%', marginTop: '6px' }}>
+                <button
+                  onClick={() => onNavigate('add-income')}
+                  style={{
+                    height: '44px',
+                    background: '#16A34A',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Plus size={16} /> {t('addIncome')}
+                </button>
+                <button
+                  onClick={() => onNavigate('add-expense')}
+                  style={{
+                    height: '44px',
+                    background: '#DC2626',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '10px',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '6px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Minus size={16} /> {t('addExpense')}
+                </button>
+              </div>
             </div>
           ) : (
-            data.recentTransactions.map((tx) => (
+            /* Recent Transactions List */
+            data.recentTransactions.slice(0, 5).map((tx) => (
               <div
                 key={tx.id}
                 className="stitch-card"
@@ -195,7 +422,7 @@ export default function HomeScreen({ user, onNavigate }) {
                   </div>
                   <div>
                     <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>{tx.category}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{tx.paymentMethod}</div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Today • {tx.paymentMethod}</div>
                   </div>
                 </div>
 
@@ -207,7 +434,6 @@ export default function HomeScreen({ user, onNavigate }) {
                   }}>
                     {tx.type === 'INCOME' ? '+' : '-'}{formatCurrency(tx.amount)}
                   </div>
-                  <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{tx.date}</div>
                 </div>
               </div>
             ))

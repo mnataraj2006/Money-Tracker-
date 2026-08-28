@@ -110,7 +110,7 @@ function AppContent() {
   if (loading) {
     return (
       <div className="mobile-app-shell" style={{ justifyContent: 'center', alignItems: 'center', color: '#FFF' }}>
-        <div style={{ fontSize: '18px', fontWeight: '700' }}>Money Tracker...</div>
+        <div style={{ fontSize: '18px', fontWeight: '700' }}>Cashly...</div>
       </div>
     );
   }

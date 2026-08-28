@@ -1,7 +1,7 @@
 export const translations = {
   en: {
     // Navigation
-    appTitle: 'Money Tracker',
+    appTitle: 'Cashly',
     home: 'Home',
     transactions: 'Transactions',
     cash: 'Cash',
@@ -55,6 +55,11 @@ export const translations = {
     all: 'All',
     searchPlaceholder: 'Search transactions...',
     noTransactionsFound: 'No transactions found.',
+    allDates: 'All Dates',
+    filterByDate: 'Filter by Date',
+    selectDate: 'Select Date',
+    thisMonth: 'This Month',
+    clearFilter: 'Clear Filter',
 
     // Cash Screen
     cashAtHome: 'Cash at Home',
@@ -161,6 +166,11 @@ export const translations = {
     all: 'அனைத்தும்',
     searchPlaceholder: 'பரிவர்த்தனைகளைத் தேடுக...',
     noTransactionsFound: 'பரிவர்த்தனைகள் எதுவும் இல்லை.',
+    allDates: 'அனைத்து தேதிகள்',
+    filterByDate: 'தேதி மூலம் வடிகட்டு',
+    selectDate: 'தேதியைத் தேர்ந்தெடு',
+    thisMonth: 'இந்த மாதம்',
+    clearFilter: 'வடிகட்டியை அகற்று',
 
     // Cash Screen
     cashAtHome: 'வீட்டில் உள்ள ரொக்கம்',

@@ -119,6 +119,9 @@ body {
 .page-container {
   width: 100%;
   max-width: 100%;
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 16px var(--page-padding-x) calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 32px) var(--page-padding-x);
   display: flex;
   flex-direction: column;

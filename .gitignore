@@ -23,3 +23,11 @@ yarn-error.log*
 # OS Files
 .DS_Store
 Thumbs.db
+
+# Keystores & Credentials
+*.keystore
+*.jks
+keystore.properties
+
+# Scratch directory
+scratch/

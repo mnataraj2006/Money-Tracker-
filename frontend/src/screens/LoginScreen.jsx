@@ -122,7 +122,7 @@ export default function LoginScreen({ onLoginSuccess }) {
         </div>
         <div>
           <h1 style={{ fontSize: '28px', fontWeight: '800', color: 'var(--navy-primary)', letterSpacing: '-0.4px' }}>
-            Money Tracker
+            Cashly
           </h1>
           <p style={{ fontSize: '15px', color: 'var(--text-secondary)', marginTop: '6px', fontWeight: '500' }}>
             Simple daily money tracking

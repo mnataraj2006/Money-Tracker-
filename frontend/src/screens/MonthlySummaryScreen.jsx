@@ -42,7 +42,7 @@ export default function MonthlySummaryScreen({ month = '2026-08', onBack, user }
           <div className="app-header-icon" onClick={onBack}>
             <ArrowLeft size={20} />
           </div>
-          <span className="app-title-text">Money Tracker</span>
+          <span className="app-title-text">Cashly</span>
         </div>
         <div className="app-header-icon">
           <Bell size={18} />

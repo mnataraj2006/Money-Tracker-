@@ -1,6 +1,6 @@
 {
   "appId": "com.moneytracker.app",
-  "appName": "money-tracker",
+  "appName": "Cashly",
   "webDir": "dist",
   "plugins": {
     "GoogleAuth": {

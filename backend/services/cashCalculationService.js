@@ -81,19 +81,20 @@ class CashCalculationService {
         DailyClosing.findOne({ userId, date: targetDate }).lean()
       ]);
 
-      let physicalCash;
+      let physicalCash = null;
+      let hasCounted = false;
       if (countRow) {
         physicalCash = countRow.physicalCash;
+        hasCounted = true;
       } else if (closingRow && closingRow.isClosed && closingRow.physicalCash !== undefined && closingRow.physicalCash !== null) {
         physicalCash = closingRow.physicalCash;
-      } else {
-        physicalCash = expectedCash;
+        hasCounted = true;
       }
 
-      const difference = physicalCash - expectedCash;
-      let status = 'TALLIED';
+      const difference = hasCounted ? (physicalCash - expectedCash) : 0;
+      let status = 'NOT_COUNTED';
 
-      if (countRow || (closingRow && closingRow.isClosed)) {
+      if (hasCounted) {
         if (difference === 0) status = 'TALLIED';
         else if (difference < 0) status = 'SHORT';
         else status = 'EXTRA';
@@ -108,6 +109,7 @@ class CashCalculationService {
         physicalCash,
         difference,
         status,
+        hasCounted,
         isClosed: closingRow ? closingRow.isClosed : false,
         lastCheckDate: countRow ? countRow.createdAt : null,
         counts: countRow || null

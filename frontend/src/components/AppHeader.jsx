@@ -23,7 +23,7 @@ export default function AppHeader({ user, onNavigate, subtitle }) {
           )}
         </div>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <span className="app-title-text">{t('appTitle') || 'Money Tracker'}</span>
+          <span className="app-title-text">{t('appTitle') || 'Cashly'}</span>
           {subtitle && (
             <span style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600', marginTop: '-2px' }}>
               {subtitle}

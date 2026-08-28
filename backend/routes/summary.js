@@ -54,7 +54,11 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       previousDayCash: cashData.previousDayCash,
       expectedCash: cashData.expectedCash,
       physicalCash: cashData.physicalCash,
+      difference: cashData.difference,
       status: cashData.status,
+      hasCounted: cashData.hasCounted,
+      counts: cashData.counts,
+      isClosed: cashData.isClosed,
       recentTransactions
     });
   } catch (err) {

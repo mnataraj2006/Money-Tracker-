@@ -58,7 +58,7 @@ export default function CloseDayScreen({ user, onBack, onCloseSuccess }) {
           <div className="app-avatar-circle">
             {user?.fullName ? user.fullName.charAt(0).toUpperCase() : 'M'}
           </div>
-          <span className="app-title-text">Money Tracker</span>
+          <span className="app-title-text">Cashly</span>
         </div>
         <div className="app-header-icon">
           <Bell size={18} />

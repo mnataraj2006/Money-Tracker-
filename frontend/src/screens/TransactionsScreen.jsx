@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Bell, Filter, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard, Plus } from 'lucide-react';
+import { Search, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard, Calendar, X, Filter } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -11,23 +11,41 @@ export default function TransactionsScreen({ onNavigate, user }) {
   const [transactions, setTransactions] = useState(cache.transactions || []);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('ALL');
+  const [dateFilterMode, setDateFilterMode] = useState('ALL'); // 'ALL' | 'TODAY' | 'YESTERDAY' | 'THIS_MONTH' | 'CUSTOM'
+  const [customDate, setCustomDate] = useState('');
   const [loading, setLoading] = useState(!cache.transactions);
 
   useEffect(() => {
     loadTransactions();
-  }, [typeFilter, search]);
+  }, [typeFilter, search, dateFilterMode, customDate]);
 
   const loadTransactions = async () => {
     try {
-      if (!cache.transactions && !search.trim() && typeFilter === 'ALL') setLoading(true);
+      if (!cache.transactions && !search.trim() && typeFilter === 'ALL' && dateFilterMode === 'ALL') {
+        setLoading(true);
+      }
       const params = {};
       if (typeFilter !== 'ALL') params.type = typeFilter;
       if (search.trim()) params.search = search.trim();
 
+      // Apply date filters
+      const todayStr = new Date().toISOString().split('T')[0];
+      if (dateFilterMode === 'TODAY') {
+        params.date = todayStr;
+      } else if (dateFilterMode === 'YESTERDAY') {
+        const yesterday = new Date(Date.now() - 86400000);
+        params.date = yesterday.toISOString().split('T')[0];
+      } else if (dateFilterMode === 'THIS_MONTH') {
+        params.month = todayStr.substring(0, 7);
+      } else if (dateFilterMode === 'CUSTOM' && customDate) {
+        params.date = customDate;
+      }
+
       const data = await transactionsAPI.getAll(params);
       const txs = data.transactions || [];
       setTransactions(txs);
-      if (typeFilter === 'ALL' && !search.trim()) {
+
+      if (typeFilter === 'ALL' && !search.trim() && dateFilterMode === 'ALL') {
         updateCache('transactions', txs);
       }
     } catch (err) {
@@ -35,6 +53,21 @@ export default function TransactionsScreen({ onNavigate, user }) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleCustomDateChange = (e) => {
+    const val = e.target.value;
+    setCustomDate(val);
+    if (val) {
+      setDateFilterMode('CUSTOM');
+    } else {
+      setDateFilterMode('ALL');
+    }
+  };
+
+  const clearDateFilter = () => {
+    setDateFilterMode('ALL');
+    setCustomDate('');
   };
 
   const formatCurrency = (val) => `₹${(val || 0).toLocaleString('en-IN')}`;
@@ -56,6 +89,16 @@ export default function TransactionsScreen({ onNavigate, user }) {
     return acc;
   }, {});
 
+  const getDateFilterLabel = () => {
+    if (dateFilterMode === 'TODAY') return 'Today';
+    if (dateFilterMode === 'YESTERDAY') return 'Yesterday';
+    if (dateFilterMode === 'THIS_MONTH') return 'This Month';
+    if (dateFilterMode === 'CUSTOM' && customDate) return customDate;
+    return null;
+  };
+
+  const activeDateLabel = getDateFilterLabel();
+
   return (
     <PageContainer>
       <h1 className="page-title">{t('transactions')}</h1>
@@ -72,8 +115,8 @@ export default function TransactionsScreen({ onNavigate, user }) {
         />
       </div>
 
-      {/* Filter Pills */}
-      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '4px' }}>
+      {/* Type Filter Pills */}
+      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
         <button
           onClick={() => setTypeFilter('ALL')}
           style={{
@@ -126,8 +169,136 @@ export default function TransactionsScreen({ onNavigate, user }) {
         </button>
       </div>
 
+      {/* Date Filter Bar & Quick Pills */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', background: 'var(--bg-card)', padding: '12px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)' }}>
+            <Calendar size={14} color="var(--navy-primary)" />
+            <span>{t('filterByDate')}</span>
+          </div>
+
+          {activeDateLabel && (
+            <button
+              onClick={clearDateFilter}
+              style={{
+                background: 'none',
+                border: 'none',
+                color: 'var(--red-expense)',
+                fontSize: '11px',
+                fontWeight: '700',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '3px'
+              }}
+            >
+              <X size={12} /> {t('clearFilter')}
+            </button>
+          )}
+        </div>
+
+        {/* Date Presets Row */}
+        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '2px' }}>
+          <button
+            onClick={clearDateFilter}
+            style={{
+              padding: '5px 10px',
+              borderRadius: '6px',
+              border: dateFilterMode === 'ALL' ? '1px solid var(--navy-primary)' : '1px solid var(--border-color)',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              backgroundColor: dateFilterMode === 'ALL' ? 'var(--navy-primary)' : '#FFF',
+              color: dateFilterMode === 'ALL' ? '#FFF' : 'var(--text-secondary)',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {t('allDates')}
+          </button>
+
+          <button
+            onClick={() => { setDateFilterMode('TODAY'); setCustomDate(''); }}
+            style={{
+              padding: '5px 10px',
+              borderRadius: '6px',
+              border: dateFilterMode === 'TODAY' ? '1px solid var(--navy-primary)' : '1px solid var(--border-color)',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              backgroundColor: dateFilterMode === 'TODAY' ? 'var(--navy-primary)' : '#FFF',
+              color: dateFilterMode === 'TODAY' ? '#FFF' : 'var(--text-secondary)',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {t('today')}
+          </button>
+
+          <button
+            onClick={() => { setDateFilterMode('YESTERDAY'); setCustomDate(''); }}
+            style={{
+              padding: '5px 10px',
+              borderRadius: '6px',
+              border: dateFilterMode === 'YESTERDAY' ? '1px solid var(--navy-primary)' : '1px solid var(--border-color)',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              backgroundColor: dateFilterMode === 'YESTERDAY' ? 'var(--navy-primary)' : '#FFF',
+              color: dateFilterMode === 'YESTERDAY' ? '#FFF' : 'var(--text-secondary)',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {t('yesterday')}
+          </button>
+
+          <button
+            onClick={() => { setDateFilterMode('THIS_MONTH'); setCustomDate(''); }}
+            style={{
+              padding: '5px 10px',
+              borderRadius: '6px',
+              border: dateFilterMode === 'THIS_MONTH' ? '1px solid var(--navy-primary)' : '1px solid var(--border-color)',
+              fontSize: '11px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              backgroundColor: dateFilterMode === 'THIS_MONTH' ? 'var(--navy-primary)' : '#FFF',
+              color: dateFilterMode === 'THIS_MONTH' ? '#FFF' : 'var(--text-secondary)',
+              whiteSpace: 'nowrap'
+            }}
+          >
+            {t('thisMonth')}
+          </button>
+        </div>
+
+        {/* Custom Date Input */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
+          <input
+            type="date"
+            className="input-control"
+            value={customDate}
+            onChange={handleCustomDateChange}
+            style={{
+              height: '38px',
+              fontSize: '12px',
+              padding: '0 10px',
+              borderColor: dateFilterMode === 'CUSTOM' ? 'var(--navy-primary)' : 'var(--border-color)'
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Active Filter Indicator Badge */}
+      {activeDateLabel && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--navy-primary)', fontWeight: '700', background: '#EEF2FF', padding: '6px 12px', borderRadius: '8px' }}>
+          <Calendar size={13} />
+          <span>Filtered: {activeDateLabel}</span>
+        </div>
+      )}
+
       {/* Grouped Transaction Lists */}
-      {Object.keys(grouped).length === 0 ? (
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: '13px' }}>
+          Loading transactions...
+        </div>
+      ) : Object.keys(grouped).length === 0 ? (
         <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)' }}>
           {t('noTransactionsFound')}
         </div>

@@ -19,10 +19,12 @@ import {
   Moon,
   RefreshCw,
   Calculator,
-  X
+  X,
+  Clock
 } from 'lucide-react';
 import { transactionsAPI, summaryAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import PageContainer from '../components/PageContainer';
 
 export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, user }) {
   const { t, language } = useLanguage();
@@ -87,16 +89,16 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
     }
   };
 
-  const formatCurrency = (val) => {
+  const formatCurrency = (val, showPlus = false) => {
     const num = val || 0;
     const formatted = Math.abs(num).toLocaleString(language === 'ta' ? 'ta-IN' : 'en-IN');
     if (num < 0) return `-₹${formatted}`;
-    if (num > 0 && arguments[1] === true) return `+₹${formatted}`;
+    if (num > 0 && showPlus) return `+₹${formatted}`;
     return `₹${formatted}`;
   };
 
   const formatLongDate = (dateStr) => {
-    if (!dateStr) return '';
+    if (!dateStr) return { formattedDate: '', dayName: '' };
     const [y, m, d] = dateStr.split('-').map(Number);
     const dateObj = new Date(y, m - 1, d);
     const dayName = dateObj.toLocaleDateString(language === 'ta' ? 'ta-IN' : 'en-US', { weekday: 'long' });
@@ -139,9 +141,9 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
   const difference = physicalCash !== null && physicalCash !== undefined ? physicalCash - expectedClosing : 0;
   const status = cashData?.status || 'UNCHECKED';
 
-  const isShort = status === 'SHORT' || (physicalCash !== null && difference < 0);
-  const isExtra = status === 'EXTRA' || (physicalCash !== null && difference > 0);
-  const isTallied = status === 'TALLIED' || (physicalCash !== null && difference === 0);
+  const isShort = status === 'SHORT' || (physicalCash !== null && physicalCash !== undefined && difference < 0);
+  const isExtra = status === 'EXTRA' || (physicalCash !== null && physicalCash !== undefined && difference > 0);
+  const isTallied = status === 'TALLIED' || (physicalCash !== null && physicalCash !== undefined && difference === 0);
   const diffAbs = Math.abs(difference);
 
   const countsObj = cashData?.counts || {};
@@ -162,19 +164,34 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
 
   return (
     <div className="screen-container">
-      {/* 1. Header & Navigation */}
-      <div className="app-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="app-header-icon" onClick={onBack} style={{ cursor: 'pointer' }}>
-            <ArrowLeft size={20} />
-          </div>
-          <span className="app-title-text">Daily Details</span>
-        </div>
+      {/* 1. PAGE HEADER */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '2px' }}>
+        <button
+          onClick={onBack}
+          style={{
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            background: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--navy-primary)',
+            cursor: 'pointer'
+          }}
+        >
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="page-title" style={{ margin: 0, fontSize: '20px' }}>Daily Details</h1>
       </div>
 
-      {/* 21. Date Navigation */}
-      <div className="stitch-card" style={{ padding: '10px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button onClick={handlePrevDay} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>
+      {/* 2. DATE NAVIGATION */}
+      <div className="stitch-card" style={{ padding: '12px 16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button
+          onClick={handlePrevDay}
+          style={{ width: '36px', height: '36px', border: 'none', background: 'var(--bg-app)', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
           <ChevronLeft size={22} color="var(--navy-primary)" />
         </button>
 
@@ -182,37 +199,52 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
           <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--navy-primary)' }}>
             {formattedDate}
           </div>
-          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '600' }}>
             {dayName}
           </div>
         </div>
 
-        <button onClick={handleNextDay} style={{ border: 'none', background: 'none', cursor: 'pointer' }}>
+        <button
+          onClick={handleNextDay}
+          style={{ width: '36px', height: '36px', border: 'none', background: 'var(--bg-app)', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+        >
           <ChevronRight size={22} color="var(--navy-primary)" />
         </button>
       </div>
 
-      {/* 2. Day Status Banner */}
-      {hasCountData && (
-        <div style={{ marginTop: '2px' }}>
-          {isTallied ? (
-            <div className="badge-pill tallied" style={{ width: '100%', justifyContent: 'center', padding: '10px', fontSize: '13px' }}>
-              <CheckCircle size={16} />
-              <span>✓ CASH TALLIED</span>
+      {/* 3. CASH STATUS — HIGH PRIORITY CARD */}
+      <div style={{ marginTop: '2px' }}>
+        {!hasCountData ? (
+          <div className="badge-pill" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '13px', background: '#F1F5F9', color: '#475569', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Clock size={16} />
+            <span>○ CASH NOT COUNTED YET</span>
+          </div>
+        ) : isTallied ? (
+          <div className="badge-pill tallied" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '13px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <CheckCircle size={18} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span style={{ fontWeight: '800' }}>✓ CASH TALLIED</span>
+              <span style={{ fontSize: '11px', opacity: 0.9 }}>Physical cash matches expected cash perfectly</span>
             </div>
-          ) : isShort ? (
-            <div className="badge-pill short" style={{ width: '100%', justifyContent: 'center', padding: '10px', fontSize: '13px' }}>
-              <AlertTriangle size={16} />
-              <span>⚠ CASH SHORT BY {formatCurrency(diffAbs)}</span>
+          </div>
+        ) : isShort ? (
+          <div className="badge-pill short" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '13px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={18} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span style={{ fontWeight: '800' }}>⚠ CASH SHORT BY {formatCurrency(diffAbs)}</span>
+              <span style={{ fontSize: '11px', opacity: 0.9 }}>Physical cash is less than expected</span>
             </div>
-          ) : (
-            <div className="badge-pill extra" style={{ width: '100%', justifyContent: 'center', padding: '10px', fontSize: '13px' }}>
-              <AlertTriangle size={16} />
-              <span>⚠ CASH EXTRA BY {formatCurrency(diffAbs)}</span>
+          </div>
+        ) : (
+          <div className="badge-pill extra" style={{ width: '100%', justifyContent: 'center', padding: '12px', fontSize: '13px', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <AlertTriangle size={18} />
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              <span style={{ fontWeight: '800' }}>⚠ CASH EXTRA BY {formatCurrency(diffAbs)}</span>
+              <span style={{ fontSize: '11px', opacity: 0.9 }}>Physical cash is more than expected</span>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       {loading ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -225,37 +257,37 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
         </div>
       ) : (
         <>
-          {/* 3. Daily Financial Summary */}
+          {/* 4. DAILY FINANCIAL SUMMARY */}
           <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--navy-primary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-              | Daily Financial Summary
+            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+              DAILY FINANCIAL SUMMARY
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center', background: 'var(--bg-app)', padding: '12px', borderRadius: '10px' }}>
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--green-income)', fontWeight: '700' }}>INCOME</div>
+                <div style={{ fontSize: '11px', color: 'var(--green-income)', fontWeight: '700' }}>Income</div>
                 <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--green-income)', marginTop: '2px' }}>
                   {formatCurrency(totalIncome)}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: 'var(--red-expense)', fontWeight: '700' }}>EXPENSE</div>
+                <div style={{ fontSize: '11px', color: 'var(--red-expense)', fontWeight: '700' }}>Expense</div>
                 <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--red-expense)', marginTop: '2px' }}>
                   {formatCurrency(totalExpense)}
                 </div>
               </div>
 
               <div>
-                <div style={{ fontSize: '11px', color: netBalance >= 0 ? 'var(--green-income)' : 'var(--red-expense)', fontWeight: '700' }}>NET</div>
-                <div style={{ fontSize: '16px', fontWeight: '800', color: netBalance >= 0 ? 'var(--green-income)' : 'var(--red-expense)', marginTop: '2px' }}>
+                <div style={{ fontSize: '11px', color: netBalance >= 0 ? 'var(--navy-primary)' : 'var(--red-expense)', fontWeight: '700' }}>Net</div>
+                <div style={{ fontSize: '16px', fontWeight: '800', color: netBalance >= 0 ? 'var(--navy-primary)' : 'var(--red-expense)', marginTop: '2px' }}>
                   {formatCurrency(netBalance, true)}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* 4. Income Records Section */}
+          {/* 5. INCOME RECORDS */}
           <div className="stitch-card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--green-income)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -264,7 +296,7 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
               <button
                 className="btn-outline-navy"
                 onClick={() => onNavigate('add-income', { date: currentDate, from: 'daily-details' })}
-                style={{ padding: '4px 10px', fontSize: '11px' }}
+                style={{ padding: '4px 12px', fontSize: '11px', height: '32px', borderRadius: '6px' }}
               >
                 + Add
               </button>
@@ -304,9 +336,6 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
                             <span style={{ fontWeight: '700', color: isCash ? 'var(--navy-primary)' : 'var(--text-secondary)' }}>
                               {tx.paymentMethod}
                             </span>
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}>
-                              ({isCash ? 'affects home cash' : 'does NOT affect home cash'})
-                            </span>
                           </div>
                         </div>
                       </div>
@@ -326,7 +355,7 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
             )}
           </div>
 
-          {/* 5. Expense Records Section */}
+          {/* 6. EXPENSE RECORDS */}
           <div className="stitch-card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--red-expense)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -335,7 +364,7 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
               <button
                 className="btn-outline-navy"
                 onClick={() => onNavigate('add-expense', { date: currentDate, from: 'daily-details' })}
-                style={{ padding: '4px 10px', fontSize: '11px' }}
+                style={{ padding: '4px 12px', fontSize: '11px', height: '32px', borderRadius: '6px' }}
               >
                 + Add
               </button>
@@ -375,9 +404,6 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
                             <span style={{ fontWeight: '700', color: isCash ? 'var(--navy-primary)' : 'var(--text-secondary)' }}>
                               {tx.paymentMethod}
                             </span>
-                            <span style={{ fontSize: '10px', color: 'var(--text-muted)', marginLeft: '4px' }}>
-                              ({isCash ? 'reduces home cash' : 'does NOT reduce home cash'})
-                            </span>
                           </div>
                         </div>
                       </div>
@@ -397,61 +423,81 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
             )}
           </div>
 
-          {/* 17. Cash vs Non-Cash Movement Summary */}
-          <div className="stitch-card" style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--navy-primary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-              | Cash vs Non-Cash Activity
+          {/* 7. CASH VS NON-CASH ACTIVITY */}
+          <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+              CASH VS NON-CASH ACTIVITY
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <div style={{ backgroundColor: 'var(--bg-app)', padding: '10px', borderRadius: '10px' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--navy-primary)' }}>CASH MOVEMENT</div>
-                <div style={{ fontSize: '12px', color: 'var(--green-income)', marginTop: '4px' }}>Cash In: {formatCurrency(cashIncome)}</div>
-                <div style={{ fontSize: '12px', color: 'var(--red-expense)' }}>Cash Out: {formatCurrency(cashExpense)}</div>
-                <div style={{ fontSize: '13px', fontWeight: '800', marginTop: '4px', color: 'var(--text-main)' }}>Net Change: {formatCurrency(netCashChange, true)}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+              {/* Cash Movement Card */}
+              <div style={{ backgroundColor: 'var(--bg-app)', padding: '12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--navy-primary)' }}>CASH MOVEMENT</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Cash In</span>
+                  <span style={{ fontWeight: '700', color: 'var(--green-income)' }}>{formatCurrency(cashIncome)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>Cash Out</span>
+                  <span style={{ fontWeight: '700', color: 'var(--red-expense)' }}>{formatCurrency(cashExpense)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', borderTop: '1px dashed var(--border-color)', paddingTop: '4px', marginTop: '2px' }}>
+                  <span>Net Cash</span>
+                  <span style={{ color: 'var(--navy-primary)' }}>{formatCurrency(netCashChange, true)}</span>
+                </div>
               </div>
 
-              <div style={{ backgroundColor: 'var(--bg-app)', padding: '10px', borderRadius: '10px' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)' }}>NON-CASH (UPI/Bank/Card)</div>
-                <div style={{ fontSize: '12px', color: 'var(--green-income)', marginTop: '4px' }}>UPI In: {formatCurrency(nonCashIncome)}</div>
-                <div style={{ fontSize: '12px', color: 'var(--red-expense)' }}>UPI Out: {formatCurrency(nonCashExpense)}</div>
-                <div style={{ fontSize: '13px', fontWeight: '800', marginTop: '4px', color: 'var(--text-secondary)' }}>Total: {formatCurrency(nonCashTotal)}</div>
+              {/* Non-Cash Card */}
+              <div style={{ backgroundColor: 'var(--bg-app)', padding: '12px', borderRadius: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)' }}>NON-CASH (UPI/BANK/CARD)</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>UPI/Bank In</span>
+                  <span style={{ fontWeight: '700', color: 'var(--green-income)' }}>{formatCurrency(nonCashIncome)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>UPI/Bank Out</span>
+                  <span style={{ fontWeight: '700', color: 'var(--red-expense)' }}>{formatCurrency(nonCashExpense)}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '800', borderTop: '1px dashed var(--border-color)', paddingTop: '4px', marginTop: '2px' }}>
+                  <span>Total Non-Cash</span>
+                  <span style={{ color: 'var(--text-main)' }}>{formatCurrency(nonCashTotal)}</span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* 7 & 8. Home Cash Calculation Section & Table */}
+          {/* 8. HOME CASH CALCULATION */}
           <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--navy-primary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-              | Home Cash Calculation
+            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+              HOME CASH CALCULATION
             </div>
 
-            <div style={{ backgroundColor: 'var(--bg-app)', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
+            <div style={{ backgroundColor: 'var(--bg-app)', borderRadius: '10px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '13px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>PREVIOUS DAY CASH</span>
+                <span style={{ color: 'var(--text-secondary)', fontWeight: '600' }}>Previous Day Cash</span>
                 <span style={{ fontWeight: '700' }}>{formatCurrency(previousDayCash)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--green-income)', fontWeight: '600' }}>+ TODAY'S CASH INCOME</span>
-                <span style={{ fontWeight: '700', color: 'var(--green-income)' }}>{formatCurrency(cashIncome)}</span>
+                <span style={{ color: 'var(--green-income)', fontWeight: '600' }}>+ Today's Cash Income</span>
+                <span style={{ fontWeight: '700', color: 'var(--green-income)' }}>+{formatCurrency(cashIncome)}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: 'var(--red-expense)', fontWeight: '600' }}>− TODAY'S CASH EXPENSE</span>
-                <span style={{ fontWeight: '700', color: 'var(--red-expense)' }}>{formatCurrency(cashExpense)}</span>
+                <span style={{ color: 'var(--red-expense)', fontWeight: '600' }}>− Today's Cash Expense</span>
+                <span style={{ fontWeight: '700', color: 'var(--red-expense)' }}>-{formatCurrency(cashExpense)}</span>
               </div>
-              <div style={{ borderTop: '1.5px dashed var(--border-color)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: '800', fontSize: '15px' }}>
+              <div style={{ borderTop: '1.5px solid var(--border-color)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: '800', fontSize: '15px' }}>
                 <span style={{ color: 'var(--navy-primary)' }}>EXPECTED CASH</span>
                 <span style={{ color: 'var(--navy-primary)' }}>{formatCurrency(expectedClosing)}</span>
               </div>
             </div>
           </div>
 
-          {/* 9 & 10. Physical Cash Denomination Section */}
+          {/* 9. PHYSICAL CASH COUNT */}
           <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--navy-primary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-                  | Physical Cash Count
+                <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                  PHYSICAL CASH COUNT
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Cash counted at home</div>
               </div>
@@ -459,28 +505,28 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
               <button
                 className="btn-outline-navy"
                 onClick={() => onNavigate('count-cash', { targetDate: currentDate, from: 'daily-details' })}
-                style={{ padding: '4px 10px', fontSize: '11px' }}
+                style={{ padding: '6px 12px', fontSize: '11px', height: 'auto', borderRadius: '6px' }}
               >
                 <Calculator size={14} /> {hasCountData ? 'Recount' : 'Count Cash'}
               </button>
             </div>
 
             {!hasCountData ? (
-              <div style={{ textAlign: 'center', padding: '20px', backgroundColor: 'var(--bg-app)', borderRadius: '12px' }}>
+              <div style={{ textAlign: 'center', padding: '20px', backgroundColor: 'var(--bg-app)', borderRadius: '10px' }}>
                 <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
                   Physical cash has not been counted yet for this day.
                 </div>
                 <button
                   className="btn-primary-navy"
                   onClick={() => onNavigate('count-cash', { targetDate: currentDate, from: 'daily-details' })}
-                  style={{ padding: '8px 16px', fontSize: '12px' }}
+                  style={{ padding: '8px 16px', fontSize: '12px', height: 'auto', display: 'inline-flex', width: 'auto' }}
                 >
                   <Calculator size={14} /> Count Cash Now
                 </button>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '80px 1fr 100px', fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>
                   <span>Denomination</span>
                   <span style={{ textAlign: 'center' }}>Quantity</span>
                   <span style={{ textAlign: 'right' }}>Total</span>
@@ -489,7 +535,7 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
                 {denominations.map(d => {
                   const subtotal = d.value * d.qty;
                   return (
-                    <div key={d.label} style={{ display: 'grid', gridTemplateColumns: '80px 1fr 100px', fontSize: '13px', alignItems: 'center', padding: '4px 0' }}>
+                    <div key={d.label} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', fontSize: '13px', alignItems: 'center', padding: '3px 0' }}>
                       <span style={{ fontWeight: '700', color: 'var(--navy-primary)' }}>{d.label}</span>
                       <span style={{ textAlign: 'center', color: 'var(--text-main)', fontWeight: '600' }}>× {d.qty}</span>
                       <span style={{ textAlign: 'right', fontWeight: '700', color: 'var(--text-main)' }}>{formatCurrency(subtotal)}</span>
@@ -497,7 +543,7 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
                   );
                 })}
 
-                <div style={{ borderTop: '1.5px solid var(--border-color)', paddingTop: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ borderTop: '1.5px solid var(--border-color)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span style={{ fontSize: '13px', fontWeight: '800', color: 'var(--text-main)' }}>PHYSICAL CASH</span>
                   <span style={{ fontSize: '18px', fontWeight: '800', color: 'var(--navy-primary)' }}>{formatCurrency(physicalCash)}</span>
                 </div>
@@ -505,10 +551,10 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
             )}
           </div>
 
-          {/* 11, 12, 13. Cash Reconciliation Section */}
+          {/* 10. CASH RECONCILIATION */}
           <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--navy-primary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-              | Cash Reconciliation
+            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+              CASH RECONCILIATION
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '13px' }}>
@@ -518,7 +564,7 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Physical Cash:</span>
-                <span style={{ fontWeight: '700' }}>{formatCurrency(physicalCash || expectedClosing)}</span>
+                <span style={{ fontWeight: '700' }}>{hasCountData ? formatCurrency(physicalCash) : 'Not counted'}</span>
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Difference:</span>
@@ -530,10 +576,10 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
 
             {/* Reconciliation Banner */}
             {isTallied ? (
-              <div style={{ backgroundColor: 'var(--green-income-bg)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: '12px', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                <CheckCircle size={22} color="var(--green-income)" />
+              <div style={{ backgroundColor: 'var(--green-income-bg)', border: '1px solid rgba(22,163,74,0.3)', borderRadius: '10px', padding: '10px 12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <CheckCircle size={20} color="var(--green-income)" />
                 <div>
-                  <div style={{ color: 'var(--green-income)', fontWeight: '800', fontSize: '14px' }}>
+                  <div style={{ color: 'var(--green-income)', fontWeight: '800', fontSize: '13px' }}>
                     ✓ CASH TALLIED
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
@@ -542,46 +588,46 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
                 </div>
               </div>
             ) : isShort ? (
-              <div style={{ backgroundColor: 'var(--red-expense-bg)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--red-expense)', fontWeight: '800', fontSize: '14px' }}>
-                  <AlertTriangle size={18} />
+              <div style={{ backgroundColor: 'var(--red-expense-bg)', border: '1px solid rgba(220,38,38,0.3)', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--red-expense)', fontWeight: '800', fontSize: '13px' }}>
+                  <AlertTriangle size={16} />
                   <span>⚠ CASH SHORT BY {formatCurrency(diffAbs)}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     className="btn-outline-navy"
                     onClick={() => onNavigate('count-cash', { targetDate: currentDate, from: 'daily-details' })}
-                    style={{ flex: 1, padding: '8px', fontSize: '11px', borderColor: 'var(--red-expense)', color: 'var(--red-expense)' }}
+                    style={{ flex: 1, padding: '6px', fontSize: '11px', height: 'auto', borderColor: 'var(--red-expense)', color: 'var(--red-expense)' }}
                   >
-                    <RefreshCw size={14} /> Recount Cash
+                    <RefreshCw size={12} /> Recount Cash
                   </button>
                   <button
                     className="btn-primary-navy"
                     onClick={() => onNavigate('add-expense', { date: currentDate, from: 'daily-details' })}
-                    style={{ flex: 1, padding: '8px', fontSize: '11px' }}
+                    style={{ flex: 1, padding: '6px', fontSize: '11px', height: 'auto' }}
                   >
                     + Add Missing Expense
                   </button>
                 </div>
               </div>
             ) : (
-              <div style={{ backgroundColor: 'rgba(217, 119, 6, 0.1)', border: '1px solid rgba(217,119,6,0.3)', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#B45309', fontWeight: '800', fontSize: '14px' }}>
-                  <AlertTriangle size={18} />
+              <div style={{ backgroundColor: 'rgba(217, 119, 6, 0.1)', border: '1px solid rgba(217,119,6,0.3)', borderRadius: '10px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#B45309', fontWeight: '800', fontSize: '13px' }}>
+                  <AlertTriangle size={16} />
                   <span>⚠ CASH EXTRA BY {formatCurrency(diffAbs)}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
                     className="btn-outline-navy"
                     onClick={() => onNavigate('count-cash', { targetDate: currentDate, from: 'daily-details' })}
-                    style={{ flex: 1, padding: '8px', fontSize: '11px', borderColor: '#B45309', color: '#B45309' }}
+                    style={{ flex: 1, padding: '6px', fontSize: '11px', height: 'auto', borderColor: '#B45309', color: '#B45309' }}
                   >
-                    <RefreshCw size={14} /> Recount Cash
+                    <RefreshCw size={12} /> Recount Cash
                   </button>
                   <button
                     className="btn-primary-navy"
                     onClick={() => onNavigate('add-income', { date: currentDate, from: 'daily-details' })}
-                    style={{ flex: 1, padding: '8px', fontSize: '11px' }}
+                    style={{ flex: 1, padding: '6px', fontSize: '11px', height: 'auto' }}
                   >
                     + Add Missing Income
                   </button>
@@ -590,10 +636,10 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
             )}
           </div>
 
-          {/* 14. Day Closing Information Section */}
+          {/* 11. DAILY CLOSING STATUS */}
           <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-            <div style={{ fontSize: '12px', fontWeight: '800', color: 'var(--navy-primary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
-              | Daily Closing Status
+            <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+              DAILY CLOSING STATUS
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -602,7 +648,7 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
                   {cashData?.isClosed ? 'Day Closed' : 'Day Not Closed'}
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                  {cashData?.isClosed ? `${formattedDate}` : 'Closing locks cash balance for starting tomorrow.'}
+                  {cashData?.isClosed ? `${formattedDate}` : 'Closing today\'s cash will lock the financial record for tomorrow.'}
                 </div>
               </div>
 
@@ -610,7 +656,7 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
                 <button
                   className="btn-primary-navy"
                   onClick={() => onNavigate('close-day', { date: currentDate })}
-                  style={{ padding: '8px 14px', fontSize: '12px' }}
+                  style={{ padding: '8px 14px', fontSize: '12px', height: 'auto' }}
                 >
                   <Moon size={14} /> Close Day
                 </button>
@@ -620,7 +666,7 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
         </>
       )}
 
-      {/* 19. Transaction Edit/Delete Options Modal */}
+      {/* Transaction Edit/Delete Options Modal */}
       {selectedTx && !showConfirmDelete && (
         <div style={{
           position: 'fixed',
