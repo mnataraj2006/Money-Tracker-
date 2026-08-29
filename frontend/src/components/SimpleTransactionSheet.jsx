@@ -4,6 +4,7 @@ import { X, Trash2, Save } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useDataCache } from '../context/DataContext';
+import TransactionNameAutocomplete from './TransactionNameAutocomplete';
 
 export default function SimpleTransactionSheet({
   isOpen,
@@ -263,18 +264,17 @@ export default function SimpleTransactionSheet({
               </div>
             </div>
 
-            {/* 2. Transaction Name Field */}
+            {/* 2. Transaction Name Field with Autocomplete */}
             <div className="sheet-field-group">
               <label className="sheet-field-label" style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
                 2 &nbsp; {t('transactionName')}
               </label>
-              <input
-                type="text"
+              <TransactionNameAutocomplete
                 className="sheet-input"
                 placeholder={t('enterTransactionName')}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
-                style={{
+                onChange={(val) => setName(val)}
+                inputStyle={{
                   width: '100%',
                   padding: '14px 16px',
                   fontSize: '16px',

@@ -3,6 +3,7 @@ import { ArrowLeft, Bell, Save, Calendar, Mic } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
 import VoiceEntryModal from '../components/VoiceEntryModal';
+import TransactionNameAutocomplete from '../components/TransactionNameAutocomplete';
 
 export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx }) {
   const { clearCache } = useDataCache();
@@ -139,15 +140,14 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx
           </div>
         </div>
 
-        {/* Transaction Name Input */}
+        {/* Transaction Name Input with Autocomplete */}
         <div className="input-group">
           <label className="input-label">Transaction Name</label>
-          <input
-            type="text"
-            className="input-control"
-            placeholder="e.g. Salary, Client Payment"
+          <TransactionNameAutocomplete
+            placeholder="e.g. Salary, Client Payment, சம்பளம்"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(val) => setName(val)}
+            required
           />
         </div>
 
