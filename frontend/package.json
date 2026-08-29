@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "cap:sync": "npx cap sync android",
+    "build:apk": "npm run build && npx cap sync android && cd android && gradlew.bat assembleDebug && copy app\\build\\outputs\\apk\\debug\\Cashly.apk ..\\Cashly.apk"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",

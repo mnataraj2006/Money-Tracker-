@@ -31,3 +31,8 @@ keystore.properties
 
 # Scratch directory
 scratch/
+
+# Android build outputs
+*.apk
+frontend/android/app/build/
+frontend/android/build/
