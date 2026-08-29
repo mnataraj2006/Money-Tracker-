@@ -1,0 +1,321 @@
+import React, { useState, useEffect } from 'react';
+import { ChevronLeft, ChevronRight, Plus, Mic, Settings } from 'lucide-react';
+import { summaryAPI, transactionsAPI } from '../services/api';
+import { useLanguage } from '../context/LanguageContext';
+import SimpleTransactionSheet from '../components/SimpleTransactionSheet';
+import VoiceEntryModal from '../components/VoiceEntryModal';
+import '../styles/SimplePassbookView.css';
+
+export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
+  const { t, language } = useLanguage();
+  const [currentDate, setCurrentDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const [transactions, setTransactions] = useState([]);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpense, setTotalExpense] = useState(0);
+  const [currentBalance, setCurrentBalance] = useState(0);
+
+  // Bottom Sheet State
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [selectedTx, setSelectedTx] = useState(null);
+
+  // Voice State
+  const [showVoiceModal, setShowVoiceModal] = useState(false);
+  const [voicePreset, setVoicePreset] = useState(null);
+
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  useEffect(() => {
+    loadDailyData();
+  }, [currentDate]);
+
+  const loadDailyData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const data = await summaryAPI.getDailyDetails(currentDate);
+      
+      const txs = data.transactions || [];
+      setTransactions(txs);
+
+      const inc = txs.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
+      const exp = txs.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
+      
+      setTotalIncome(inc);
+      setTotalExpense(exp);
+      
+      if (data.closingBalance !== undefined && data.closingBalance !== null) {
+        setCurrentBalance(data.closingBalance);
+      } else if (data.dashboard && data.dashboard.totalBalance !== undefined) {
+        setCurrentBalance(data.dashboard.totalBalance);
+      } else {
+        setCurrentBalance(inc - exp);
+      }
+    } catch (err) {
+      console.error('Failed to load passbook daily details:', err);
+      setError(t('unableToLoadHistory'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrevDay = () => {
+    const d = new Date(currentDate + 'T00:00:00');
+    d.setDate(d.getDate() - 1);
+    setCurrentDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleNextDay = () => {
+    const d = new Date(currentDate + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    setCurrentDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleTodayClick = () => {
+    setCurrentDate(todayStr);
+  };
+
+  const formatDateDisplay = (dateStr) => {
+    const d = new Date(dateStr + 'T00:00:00');
+    if (language === 'ta') {
+      const monthNamesTa = [
+        'ஜனவரி', 'பிப்ரவரி', 'மார்ச்', 'ஏப்ரல்', 'மே', 'ஜூன்',
+        'ஜூலை', 'ஆகஸ்ட்', 'செப்டம்பர்', 'அக்டோபர்', 'நவம்பர்', 'டிசம்பர்'
+      ];
+      return `${d.getDate()} ${monthNamesTa[d.getMonth()]} ${d.getFullYear()}`;
+    } else {
+      return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+    }
+  };
+
+  const formatCurrency = (val) => {
+    const num = parseFloat(val) || 0;
+    return `₹ ${num.toLocaleString(language === 'ta' ? 'ta-IN' : 'en-IN')}`;
+  };
+
+  const handleOpenNewSheet = () => {
+    setSelectedTx(null);
+    setVoicePreset(null);
+    setSheetOpen(true);
+  };
+
+  const handleOpenEditSheet = (tx) => {
+    setSelectedTx(tx);
+    setVoicePreset(null);
+    setSheetOpen(true);
+  };
+
+  const handleVoiceSuccess = (parsedData) => {
+    setShowVoiceModal(false);
+    if (parsedData) {
+      setSelectedTx(null);
+      setVoicePreset({
+        type: parsedData.type || 'EXPENSE',
+        category: parsedData.category || '',
+        amount: parsedData.amount || '',
+        note: parsedData.note || ''
+      });
+      setSheetOpen(true);
+    }
+  };
+
+  const incomeTxs = transactions.filter(t => t.type === 'INCOME');
+  const expenseTxs = transactions.filter(t => t.type === 'EXPENSE');
+
+  return (
+    <div className="passbook-container">
+      {/* 1. Top Header */}
+      <div className="passbook-header">
+        <div className="passbook-title-area">
+          <h2 className="passbook-title">{t('income')} / {t('expense')}</h2>
+          <span className="passbook-mode-badge">{t('simplePassbookMode')}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button className="passbook-switch-btn" onClick={onSwitchMode}>
+            {t('normalMode')}
+          </button>
+          {onNavigate && (
+            <button className="passbook-switch-btn" onClick={() => onNavigate('settings')}>
+              <Settings size={16} style={{ verticalAlign: 'middle' }} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 2. Date Navigator */}
+      <div className="passbook-date-nav">
+        <button className="passbook-arrow-btn" onClick={handlePrevDay} aria-label="Previous day">
+          <ChevronLeft size={24} />
+        </button>
+
+        <div className="passbook-date-display">
+          <div className="passbook-date-text">
+            {formatDateDisplay(currentDate)}
+          </div>
+          {currentDate !== todayStr && (
+            <button className="passbook-today-chip" onClick={handleTodayClick}>
+              {t('today')}
+            </button>
+          )}
+        </div>
+
+        <button className="passbook-arrow-btn" onClick={handleNextDay} aria-label="Next day">
+          <ChevronRight size={24} />
+        </button>
+      </div>
+
+      {/* 3. Balance Banner */}
+      <div className="passbook-balance-banner">
+        <span className="passbook-balance-label">{t('todaysBalance')}</span>
+        <span className="passbook-balance-amount">{formatCurrency(currentBalance)}</span>
+      </div>
+
+      {/* 4. Ledger Content */}
+      <div className="passbook-ledger">
+        {/* Voice Quick Assistant Entry */}
+        <div className="passbook-voice-bar" onClick={() => setShowVoiceModal(true)}>
+          <div className="passbook-voice-info">
+            <div className="passbook-voice-mic-icon">
+              <Mic size={20} />
+            </div>
+            <span>{t('speakToRecord')}</span>
+          </div>
+        </div>
+
+        {error && (
+          <div style={{ color: '#c62828', background: '#ffebee', padding: '12px', borderRadius: '8px', textAlign: 'center', fontSize: '15px' }}>
+            {error}
+          </div>
+        )}
+
+        {loading ? (
+          <div style={{ textTransform: 'uppercase', textAlign: 'center', padding: '30px', color: '#666', fontWeight: 'bold' }}>
+            {t('loading')}
+          </div>
+        ) : (
+          <>
+            {/* Income Section */}
+            <div className="passbook-section">
+              <div className="passbook-section-header income">
+                <span className="passbook-section-title income">{t('income')}</span>
+                <span className="passbook-section-total income">
+                  {t('totalIncome')} {formatCurrency(totalIncome)}
+                </span>
+              </div>
+
+              {incomeTxs.length === 0 ? (
+                <div className="passbook-empty">
+                  {t('noIncomeEntries')}
+                </div>
+              ) : (
+                <div className="passbook-row-list">
+                  {incomeTxs.map((tx) => (
+                    <div
+                      key={tx.id || tx._id}
+                      className="passbook-row"
+                      onClick={() => handleOpenEditSheet(tx)}
+                    >
+                      <div className="passbook-row-left">
+                        <span className="passbook-row-category">
+                          {tx.transactionName || tx.name || t('unnamedTransaction')}
+                        </span>
+                        {tx.description && (
+                          <span className="passbook-row-desc">{tx.description}</span>
+                        )}
+                      </div>
+                      <div className="passbook-row-right income">
+                        {formatCurrency(tx.amount)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Expense Section */}
+            <div className="passbook-section">
+              <div className="passbook-section-header expense">
+                <span className="passbook-section-title expense">{t('expense')}</span>
+                <span className="passbook-section-total expense">
+                  {t('totalExpense')} {formatCurrency(totalExpense)}
+                </span>
+              </div>
+
+              {expenseTxs.length === 0 ? (
+                <div className="passbook-empty">
+                  {t('noExpenseEntries')}
+                </div>
+              ) : (
+                <div className="passbook-row-list">
+                  {expenseTxs.map((tx) => (
+                    <div
+                      key={tx.id || tx._id}
+                      className="passbook-row"
+                      onClick={() => handleOpenEditSheet(tx)}
+                    >
+                      <div className="passbook-row-left">
+                        <span className="passbook-row-category">
+                          {tx.transactionName || tx.name || t('unnamedTransaction')}
+                        </span>
+                        {tx.description && (
+                          <span className="passbook-row-desc">{tx.description}</span>
+                        )}
+                      </div>
+                      <div className="passbook-row-right expense">
+                        {formatCurrency(tx.amount)}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* General Empty State if both are 0 */}
+            {incomeTxs.length === 0 && expenseTxs.length === 0 && (
+              <div className="passbook-empty" style={{ background: '#e8f5e9', border: '1px dashed #a5d6a7', color: '#1b5e20' }}>
+                <strong>{t('noRecordsToday')}</strong>
+                <div style={{ marginTop: '4px', fontSize: '14px' }}>
+                  {t('tapPlusToAddRecord')}
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Floating Action Button (+) */}
+      <button className="passbook-fab" onClick={handleOpenNewSheet} aria-label="Add transaction">
+        <Plus size={36} />
+      </button>
+
+      {/* Transaction Bottom Sheet */}
+      <SimpleTransactionSheet
+        isOpen={sheetOpen}
+        onClose={() => {
+          setSheetOpen(false);
+          setSelectedTx(null);
+          setVoicePreset(null);
+        }}
+        onSuccess={loadDailyData}
+        initialDate={currentDate}
+        editTx={selectedTx}
+        presetType={voicePreset?.type}
+        presetCategory={voicePreset?.category}
+        presetAmount={voicePreset?.amount}
+        presetNote={voicePreset?.note}
+      />
+
+      {/* Voice Entry Modal */}
+      {showVoiceModal && (
+        <VoiceEntryModal
+          isOpen={showVoiceModal}
+          onClose={() => setShowVoiceModal(false)}
+          onSuccess={handleVoiceSuccess}
+          initialDate={currentDate}
+        />
+      )}
+    </div>
+  );
+}

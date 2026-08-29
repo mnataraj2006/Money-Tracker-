@@ -1,22 +1,66 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, ArrowDown, ArrowUp, CheckCircle, AlertTriangle, ChevronRight, ShoppingBag, Coffee, Briefcase, Utensils, CreditCard, RotateCcw, Landmark } from 'lucide-react';
+import { Plus, Minus, Mic, ArrowDown, ArrowUp, CheckCircle, AlertTriangle, ChevronRight, ShoppingBag, Coffee, Briefcase, Utensils, CreditCard, RotateCcw, Landmark } from 'lucide-react';
 import { summaryAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useDataCache } from '../context/DataContext';
 
 import PageContainer from '../components/PageContainer';
+import VoiceEntryModal from '../components/VoiceEntryModal';
+import SimpleTransactionSheet from '../components/SimpleTransactionSheet';
 
-export default function HomeScreen({ user, onNavigate }) {
+export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
   const { t, language } = useLanguage();
   const { cache, updateCache } = useDataCache();
 
   const [data, setData] = useState(cache.dashboard || null);
   const [loading, setLoading] = useState(!cache.dashboard);
   const [error, setError] = useState(false);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+
+  // Simple Passbook Entry Sheet State
+  const [isSimpleSheetOpen, setIsSimpleSheetOpen] = useState(false);
+  const [simplePresetType, setSimplePresetType] = useState('EXPENSE');
+  const [selectedEditTx, setSelectedEditTx] = useState(null);
+
+  const handleOpenAddIncome = () => {
+    if (viewMode === 'simple') {
+      setSelectedEditTx(null);
+      setSimplePresetType('INCOME');
+      setIsSimpleSheetOpen(true);
+    } else {
+      onNavigate('add-income');
+    }
+  };
+
+  const handleOpenAddExpense = () => {
+    if (viewMode === 'simple') {
+      setSelectedEditTx(null);
+      setSimplePresetType('EXPENSE');
+      setIsSimpleSheetOpen(true);
+    } else {
+      onNavigate('add-expense');
+    }
+  };
+
+  const handleOpenEditTx = (tx) => {
+    if (viewMode === 'simple') {
+      setSelectedEditTx(tx);
+      setIsSimpleSheetOpen(true);
+    } else {
+      onNavigate('transaction-details', { txId: tx.id });
+    }
+  };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  // Reload when cache is cleared (e.g. after adding/editing a transaction)
+  useEffect(() => {
+    if (!cache.dashboard) {
+      loadData();
+    }
+  }, [cache.dashboard]);
 
   const loadData = async () => {
     try {
@@ -24,6 +68,7 @@ export default function HomeScreen({ user, onNavigate }) {
       setError(false);
       const today = new Date().toISOString().split('T')[0];
       const dash = await summaryAPI.getDashboard(today);
+
       setData(dash);
       updateCache('dashboard', dash);
     } catch (err) {
@@ -268,7 +313,7 @@ export default function HomeScreen({ user, onNavigate }) {
           {/* Row 1: Add Income & Add Expense */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
             <button
-              onClick={() => onNavigate('add-income')}
+              onClick={handleOpenAddIncome}
               style={{
                 height: '52px',
                 background: '#16A34A',
@@ -289,7 +334,7 @@ export default function HomeScreen({ user, onNavigate }) {
             </button>
 
             <button
-              onClick={() => onNavigate('add-expense')}
+              onClick={handleOpenAddExpense}
               style={{
                 height: '52px',
                 background: '#DC2626',
@@ -310,19 +355,42 @@ export default function HomeScreen({ user, onNavigate }) {
             </button>
           </div>
 
-          {/* Row 2: Count Cash */}
-          <button
-            className="btn-primary-navy"
-            onClick={() => onNavigate('cash')}
-            style={{
-              height: '52px',
-              borderRadius: '12px',
-              fontSize: '15px',
-              fontWeight: '700'
-            }}
-          >
-            💵 {t('countCash')}
-          </button>
+          {/* Row 2: Voice Entry & Count Cash */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+            <button
+              onClick={() => setIsVoiceModalOpen(true)}
+              style={{
+                height: '52px',
+                background: '#021A1A',
+                color: '#FFFFFF',
+                border: 'none',
+                borderRadius: '12px',
+                fontSize: '15px',
+                fontWeight: '700',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                cursor: 'pointer',
+                boxShadow: '0 2px 6px rgba(2, 26, 26, 0.25)'
+              }}
+            >
+              <Mic size={18} /> {t('voiceEntry') || 'Voice Entry'}
+            </button>
+
+            <button
+              className="btn-primary-navy"
+              onClick={() => onNavigate('cash')}
+              style={{
+                height: '52px',
+                borderRadius: '12px',
+                fontSize: '15px',
+                fontWeight: '700'
+              }}
+            >
+              💵 {t('countCash')}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -330,7 +398,7 @@ export default function HomeScreen({ user, onNavigate }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', letterSpacing: '0.3px', textTransform: 'uppercase' }}>
-            {t('todaysTransactions')}
+            {viewMode === 'simple' ? "QUICK'S TRANSACTIONS" : t('todaysTransactions')}
           </span>
           <span
             onClick={() => onNavigate('transactions')}
@@ -340,106 +408,274 @@ export default function HomeScreen({ user, onNavigate }) {
           </span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {!data?.recentTransactions || data.recentTransactions.length === 0 ? (
-            /* Empty State */
-            <div className="stitch-card" style={{ padding: '24px 16px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-              <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <ShoppingBag size={22} color="var(--text-secondary)" />
-              </div>
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>No transactions today</div>
-                <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>Start by adding your first income or expense.</div>
+        {viewMode === 'simple' ? (
+          /* Simple Passbook Mode Transactions Area */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* INCOME CARD */}
+            <div className="stitch-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid #C8E6C9' }}>
+              <div style={{
+                background: '#DCFCE7',
+                padding: '12px 16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid #BBF7D0'
+              }}>
+                <span style={{ fontSize: '13px', fontWeight: '800', color: '#16A34A', letterSpacing: '0.5px' }}>
+                  {t('income').toUpperCase()}
+                </span>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: '#16A34A' }}>
+                  {t('totalIncome')} {formatCurrency(data?.todayIncome)}
+                </span>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', width: '100%', marginTop: '6px' }}>
+              <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {!data?.recentTransactions || data.recentTransactions.filter(t => t.type === 'INCOME').length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '12px 0', color: '#16A34A', fontSize: '13px', fontWeight: '600' }}>
+                    {t('noIncomeEntries')}<br />
+                    <span style={{ fontSize: '12px', opacity: 0.8 }}>{t('tapToAddIncome')}</span>
+                  </div>
+                ) : (
+                  data.recentTransactions.filter(t => t.type === 'INCOME').map((tx) => (
+                    <div
+                      key={tx.id}
+                      onClick={() => handleOpenEditTx(tx)}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #F1F5F9', cursor: 'pointer' }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
+                          {tx.transactionName || tx.name || t('unnamedTransaction')}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B' }}>
+                          {tx.createdAt ? new Date(tx.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : t('today')}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#16A34A' }}>
+                        {formatCurrency(tx.amount)}
+                      </div>
+                    </div>
+                  ))
+                )}
+
                 <button
-                  onClick={() => onNavigate('add-income')}
+                  onClick={handleOpenAddIncome}
                   style={{
-                    height: '44px',
-                    background: '#16A34A',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '13px',
+                    width: '100%',
+                    height: '42px',
+                    background: '#FFFFFF',
+                    color: '#16A34A',
+                    border: '1.5px solid #16A34A',
+                    borderRadius: '8px',
+                    fontSize: '14px',
                     fontWeight: '700',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '6px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    marginTop: '4px'
                   }}
                 >
                   <Plus size={16} /> {t('addIncome')}
                 </button>
+              </div>
+            </div>
+
+            {/* EXPENSE CARD */}
+            <div className="stitch-card" style={{ padding: 0, overflow: 'hidden', border: '1px solid #FECDD3' }}>
+              <div style={{
+                background: '#FEE2E2',
+                padding: '12px 16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid #FCA5A5'
+              }}>
+                <span style={{ fontSize: '13px', fontWeight: '800', color: '#DC2626', letterSpacing: '0.5px' }}>
+                  {t('expense').toUpperCase()}
+                </span>
+                <span style={{ fontSize: '14px', fontWeight: '800', color: '#DC2626' }}>
+                  {t('totalExpense')} {formatCurrency(data?.todayExpense)}
+                </span>
+              </div>
+
+              <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {!data?.recentTransactions || data.recentTransactions.filter(t => t.type === 'EXPENSE').length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '12px 0', color: '#DC2626', fontSize: '13px', fontWeight: '600' }}>
+                    {t('noExpenseEntries')}<br />
+                    <span style={{ fontSize: '12px', opacity: 0.8 }}>{t('tapToAddExpense')}</span>
+                  </div>
+                ) : (
+                  data.recentTransactions.filter(t => t.type === 'EXPENSE').map((tx) => (
+                    <div
+                      key={tx.id}
+                      onClick={() => handleOpenEditTx(tx)}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #F1F5F9', cursor: 'pointer' }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
+                          {tx.transactionName || tx.name || t('unnamedTransaction')}
+                        </div>
+                        <div style={{ fontSize: '11px', color: '#64748B' }}>
+                          {tx.createdAt ? new Date(tx.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : t('today')}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#334155' }}>
+                        {formatCurrency(tx.amount)}
+                      </div>
+                    </div>
+                  ))
+                )}
+
                 <button
-                  onClick={() => onNavigate('add-expense')}
+                  onClick={handleOpenAddExpense}
                   style={{
-                    height: '44px',
-                    background: '#DC2626',
-                    color: '#FFFFFF',
-                    border: 'none',
-                    borderRadius: '10px',
-                    fontSize: '13px',
+                    width: '100%',
+                    height: '42px',
+                    background: '#FFFFFF',
+                    color: '#DC2626',
+                    border: '1.5px solid #DC2626',
+                    borderRadius: '8px',
+                    fontSize: '14px',
                     fontWeight: '700',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     gap: '6px',
-                    cursor: 'pointer'
+                    cursor: 'pointer',
+                    marginTop: '4px'
                   }}
                 >
                   <Minus size={16} /> {t('addExpense')}
                 </button>
               </div>
             </div>
-          ) : (
-            /* Recent Transactions List */
-            data.recentTransactions.slice(0, 5).map((tx) => (
-              <div
-                key={tx.id}
-                className="stitch-card"
-                onClick={() => onNavigate('transaction-details', { txId: tx.id })}
-                style={{
-                  padding: '12px 14px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer'
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{
-                    width: '40px',
-                    height: '40px',
-                    borderRadius: '50%',
-                    backgroundColor: tx.type === 'INCOME' ? 'var(--green-income-bg)' : 'var(--red-expense-bg)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}>
-                    {getCategoryIcon(tx.category)}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>{tx.category}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>Today • {tx.paymentMethod}</div>
-                  </div>
+          </div>
+        ) : (
+          /* Normal Mode Recent Transactions List */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {!data?.recentTransactions || data.recentTransactions.length === 0 ? (
+              /* Empty State */
+              <div className="stitch-card" style={{ padding: '24px 16px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+                <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <ShoppingBag size={22} color="var(--text-secondary)" />
+                </div>
+                <div>
+                  <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)' }}>No transactions today</div>
+                  <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '2px' }}>Start by adding your first income or expense.</div>
                 </div>
 
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{
-                    fontSize: '15px',
-                    fontWeight: '800',
-                    color: tx.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)'
-                  }}>
-                    {tx.type === 'INCOME' ? '+' : '-'}{formatCurrency(tx.amount)}
-                  </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', width: '100%', marginTop: '6px' }}>
+                  <button
+                    onClick={() => onNavigate('add-income')}
+                    style={{
+                      height: '44px',
+                      background: '#16A34A',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Plus size={16} /> {t('addIncome')}
+                  </button>
+                  <button
+                    onClick={() => onNavigate('add-expense')}
+                    style={{
+                      height: '44px',
+                      background: '#DC2626',
+                      color: '#FFFFFF',
+                      border: 'none',
+                      borderRadius: '10px',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Minus size={16} /> {t('addExpense')}
+                  </button>
                 </div>
               </div>
-            ))
-          )}
-        </div>
+            ) : (
+              /* Recent Transactions List */
+              data.recentTransactions.slice(0, 5).map((tx) => (
+                <div
+                  key={tx.id}
+                  className="stitch-card"
+                  onClick={() => onNavigate('transaction-details', { txId: tx.id })}
+                  style={{
+                    padding: '12px 14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '50%',
+                      backgroundColor: tx.type === 'INCOME' ? 'var(--green-income-bg)' : 'var(--red-expense-bg)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}>
+                      {getCategoryIcon(tx.category)}
+                    </div>
+                    <div>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
+                        {tx.transactionName || tx.name || t('unnamedTransaction')}
+                      </div>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        Today • {tx.paymentMethod} • {tx.category}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ textAlign: 'right' }}>
+                    <div style={{
+                      fontSize: '15px',
+                      fontWeight: '800',
+                      color: tx.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)'
+                    }}>
+                      {tx.type === 'INCOME' ? '+' : '-'}{formatCurrency(tx.amount)}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
+
+      <VoiceEntryModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onSuccess={loadData}
+      />
+
+      <SimpleTransactionSheet
+        isOpen={isSimpleSheetOpen}
+        onClose={() => {
+          setIsSimpleSheetOpen(false);
+          setSelectedEditTx(null);
+        }}
+        onSuccess={loadData}
+        initialDate={new Date().toISOString().split('T')[0]}
+        editTx={selectedEditTx}
+        presetType={simplePresetType}
+      />
     </PageContainer>
   );
 }

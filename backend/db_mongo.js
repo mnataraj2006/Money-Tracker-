@@ -50,12 +50,21 @@ const transactionSchema = new mongoose.Schema({
   userId: { type: String, required: true, index: true },
   type: { type: String, enum: ['INCOME', 'EXPENSE'], required: true },
   amount: { type: Number, required: true, min: 0.01 },
+  transactionName: { type: String, default: '' },
+  name: { type: String, default: '' },
   category: { type: String, required: true },
   paymentMethod: { type: String, enum: ['CASH', 'UPI', 'BANK', 'CARD', 'OTHER'], required: true },
   description: { type: String, default: '' },
   date: { type: String, required: true, index: true }, // YYYY-MM-DD
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
+});
+
+transactionSchema.pre('save', function (next) {
+  const val = (this.transactionName || this.name || '').trim();
+  this.transactionName = val;
+  this.name = val;
+  next();
 });
 
 transactionSchema.index({ userId: 1, date: -1, createdAt: -1 });

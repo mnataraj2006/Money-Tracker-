@@ -25,7 +25,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       Transaction.find({ userId, date: today })
         .sort({ createdAt: -1 })
         .limit(5)
-        .select('id type amount category paymentMethod description date')
+        .select('id type amount name transactionName category paymentMethod description date createdAt')
         .lean()
     ]);
 
@@ -223,7 +223,7 @@ router.get('/daily-details', authenticateToken, async (req, res) => {
       CashCalculationService.getExpectedCash(userId, targetDate),
       Transaction.find({ userId, date: targetDate })
         .sort({ createdAt: -1 })
-        .select('id type amount category paymentMethod description date')
+        .select('id type amount name transactionName category paymentMethod description date createdAt')
         .lean(),
       CashCount.findOne({ userId, date: targetDate }).sort({ createdAt: -1 }).lean(),
       DailyClosing.findOne({ userId, date: targetDate }).lean()

@@ -1,17 +1,20 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Bell, Save, Calendar } from 'lucide-react';
+import { ArrowLeft, Bell, Save, Calendar, Mic } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
+import VoiceEntryModal from '../components/VoiceEntryModal';
 
-export default function AddIncomeScreen({ onBack, onSuccess, initialDate }) {
+export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx }) {
   const { clearCache } = useDataCache();
-  const [amount, setAmount] = useState('');
-  const [category, setCategory] = useState('Salary');
-  const [paymentMethod, setPaymentMethod] = useState('CASH');
-  const [date, setDate] = useState(initialDate || new Date().toISOString().split('T')[0]);
-  const [note, setNote] = useState('');
+  const [amount, setAmount] = useState(editTx ? editTx.amount : '');
+  const [name, setName] = useState(editTx ? (editTx.transactionName || editTx.name || '') : '');
+  const [category, setCategory] = useState(editTx ? editTx.category : 'General');
+  const [paymentMethod, setPaymentMethod] = useState(editTx ? editTx.paymentMethod : 'CASH');
+  const [date, setDate] = useState(editTx ? editTx.date : (initialDate || new Date().toISOString().split('T')[0]));
+  const [note, setNote] = useState(editTx ? (editTx.description === 'string' ? '' : (editTx.description || '')) : '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,16 +26,36 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate }) {
       return;
     }
 
+    if (!name.trim()) {
+      setError('Please enter a transaction name');
+      return;
+    }
+
     setLoading(true);
     try {
-      await transactionsAPI.create({
-        type: 'INCOME',
-        amount: numAmount,
-        category,
-        paymentMethod,
-        description: note,
-        date
-      });
+      if (editTx && editTx.id) {
+        await transactionsAPI.update(editTx.id, {
+          type: 'INCOME',
+          amount: numAmount,
+          transactionName: name.trim(),
+          name: name.trim(),
+          category,
+          paymentMethod,
+          description: note,
+          date
+        });
+      } else {
+        await transactionsAPI.create({
+          type: 'INCOME',
+          amount: numAmount,
+          transactionName: name.trim(),
+          name: name.trim(),
+          category,
+          paymentMethod,
+          description: note,
+          date
+        });
+      }
       clearCache();
       onSuccess();
     } catch (err) {
@@ -52,8 +75,28 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate }) {
           </div>
           <span className="app-title-text">Add Income</span>
         </div>
-        <div className="app-header-icon">
-          <Bell size={18} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => setIsVoiceModalOpen(true)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: '20px',
+              backgroundColor: '#021A1A',
+              color: '#FFF',
+              border: 'none',
+              fontSize: '12px',
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            <Mic size={14} /> Voice
+          </button>
+          <div className="app-header-icon">
+            <Bell size={18} />
+          </div>
         </div>
       </div>
 
@@ -99,6 +142,18 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate }) {
           </div>
         </div>
 
+        {/* Transaction Name Input */}
+        <div className="input-group">
+          <label className="input-label">Transaction Name</label>
+          <input
+            type="text"
+            className="input-control"
+            placeholder="e.g. Salary, Client Payment"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </div>
+
         {/* Category Input */}
         <div className="input-group">
           <label className="input-label">Category</label>
@@ -107,9 +162,9 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate }) {
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           >
+            <option value="General">General</option>
             <option value="Salary">Salary</option>
             <option value="Business">Business</option>
-            <option value="Bonus">Bonus</option>
             <option value="Investments">Investments</option>
             <option value="Freelance">Freelance</option>
             <option value="Other Income">Other Income</option>
@@ -145,13 +200,13 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate }) {
           </div>
         </div>
 
-        {/* Note Input */}
+        {/* Transaction Name / Description Input */}
         <div className="input-group">
-          <label className="input-label">Notes (Optional)</label>
+          <label className="input-label">Description / Note (Optional)</label>
           <textarea
             className="input-control"
-            placeholder="Add a note..."
-            rows={3}
+            placeholder="What was this for? (e.g. Salary, Freelance)"
+            rows={2}
             value={note}
             onChange={(e) => setNote(e.target.value)}
           />
@@ -161,6 +216,13 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate }) {
           <Save size={18} /> {loading ? 'Saving...' : 'Save Income'}
         </button>
       </form>
+
+      <VoiceEntryModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onSuccess={onSuccess}
+        initialType="INCOME"
+      />
     </div>
   );
 }

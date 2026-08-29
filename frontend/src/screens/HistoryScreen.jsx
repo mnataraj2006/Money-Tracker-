@@ -260,8 +260,12 @@ export default function HistoryScreen({ user, onNavigate }) {
                     {getCategoryIcon(tx.category)}
                   </div>
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>{tx.category}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{tx.description || tx.paymentMethod} • <span style={{ fontWeight: '600' }}>{tx.paymentMethod}</span></div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>
+                      {tx.transactionName || tx.name || t('unnamedTransaction')}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      {tx.paymentMethod} • {tx.category}
+                    </div>
                   </div>
                 </div>
                 <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--green-income)' }}>
@@ -290,8 +294,12 @@ export default function HistoryScreen({ user, onNavigate }) {
                     {getCategoryIcon(tx.category)}
                   </div>
                   <div>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>{tx.category}</div>
-                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{tx.description || tx.paymentMethod} • <span style={{ fontWeight: '600' }}>{tx.paymentMethod}</span></div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>
+                      {tx.transactionName || tx.name || t('unnamedTransaction')}
+                    </div>
+                    <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      {tx.paymentMethod} • {tx.category}
+                    </div>
                   </div>
                 </div>
                 <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--red-expense)' }}>

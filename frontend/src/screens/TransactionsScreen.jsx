@@ -115,54 +115,79 @@ export default function TransactionsScreen({ onNavigate, user }) {
         />
       </div>
 
-      {/* Type Filter Pills */}
-      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '2px' }}>
+      {/* Type Filter Segmented Control */}
+      <div style={{
+        display: 'flex',
+        width: '100%',
+        backgroundColor: 'var(--bg-card)',
+        borderRadius: '12px',
+        padding: '4px',
+        border: '1px solid var(--border-color)',
+        boxShadow: 'var(--shadow-sm)',
+        minHeight: '44px',
+        boxSizing: 'border-box'
+      }}>
         <button
+          type="button"
           onClick={() => setTypeFilter('ALL')}
           style={{
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-pill)',
+            flex: 1,
+            minHeight: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '8px',
             border: 'none',
-            fontSize: '12px',
+            fontSize: '14px',
             fontWeight: '700',
             cursor: 'pointer',
-            backgroundColor: typeFilter === 'ALL' ? 'var(--navy-primary)' : 'var(--bg-card)',
-            color: typeFilter === 'ALL' ? '#FFF' : 'var(--text-secondary)',
-            boxShadow: 'var(--shadow-sm)'
+            transition: 'all 0.15s ease',
+            backgroundColor: typeFilter === 'ALL' ? 'var(--navy-primary)' : 'transparent',
+            color: typeFilter === 'ALL' ? '#FFFFFF' : 'var(--text-secondary)'
           }}
         >
           {t('all')}
         </button>
 
         <button
+          type="button"
           onClick={() => setTypeFilter('INCOME')}
           style={{
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-pill)',
+            flex: 1,
+            minHeight: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '8px',
             border: 'none',
-            fontSize: '12px',
+            fontSize: '14px',
             fontWeight: '700',
             cursor: 'pointer',
-            backgroundColor: typeFilter === 'INCOME' ? 'var(--green-income-bg)' : 'var(--bg-card)',
-            color: typeFilter === 'INCOME' ? 'var(--green-income)' : 'var(--text-secondary)',
-            boxShadow: 'var(--shadow-sm)'
+            transition: 'all 0.15s ease',
+            backgroundColor: typeFilter === 'INCOME' ? 'var(--green-income-bg)' : 'transparent',
+            color: typeFilter === 'INCOME' ? 'var(--green-income)' : 'var(--text-secondary)'
           }}
         >
           {t('income')}
         </button>
 
         <button
+          type="button"
           onClick={() => setTypeFilter('EXPENSE')}
           style={{
-            padding: '6px 14px',
-            borderRadius: 'var(--radius-pill)',
+            flex: 1,
+            minHeight: '36px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderRadius: '8px',
             border: 'none',
-            fontSize: '12px',
+            fontSize: '14px',
             fontWeight: '700',
             cursor: 'pointer',
-            backgroundColor: typeFilter === 'EXPENSE' ? 'var(--red-expense-bg)' : 'var(--bg-card)',
-            color: typeFilter === 'EXPENSE' ? 'var(--red-expense)' : 'var(--text-secondary)',
-            boxShadow: 'var(--shadow-sm)'
+            transition: 'all 0.15s ease',
+            backgroundColor: typeFilter === 'EXPENSE' ? 'var(--red-expense-bg)' : 'transparent',
+            color: typeFilter === 'EXPENSE' ? 'var(--red-expense)' : 'var(--text-secondary)'
           }}
         >
           {t('expense')}
@@ -354,10 +379,10 @@ export default function TransactionsScreen({ onNavigate, user }) {
                       </div>
                       <div>
                         <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
-                          {tx.category}
+                          {tx.transactionName || tx.name || t('unnamedTransaction')}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                          {tx.paymentMethod} {tx.description ? `• ${tx.description}` : ''}
+                          {dateStr} • {tx.paymentMethod}{tx.category ? ` • ${tx.category}` : ''}{tx.description ? ` • ${tx.description}` : ''}
                         </div>
                       </div>
                     </div>

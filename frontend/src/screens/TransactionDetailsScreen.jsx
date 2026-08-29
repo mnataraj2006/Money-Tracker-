@@ -90,8 +90,8 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           {getCategoryIcon(tx.category, tx.type)}
         </div>
 
-        <div style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>
-          {tx.category}
+        <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)', textAlign: 'center' }}>
+          {tx.transactionName || tx.name || 'Unnamed Transaction'}
         </div>
 
         <div style={{
@@ -110,21 +110,16 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           fontSize: '12px',
           fontWeight: '700'
         }}>
-          {tx.paymentMethod}
+          {tx.date} • {tx.paymentMethod} • {tx.category}
         </div>
       </div>
 
       {/* Metadata Rows Card */}
       <div className="stitch-card" style={{ padding: '8px 16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Date</span>
-          <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>{tx.date}</span>
-        </div>
-
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Type</span>
-          <span style={{ color: tx.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)', fontSize: '13px', fontWeight: '700' }}>
-            {tx.type}
+          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Transaction Name</span>
+          <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>
+            {tx.transactionName || tx.name || '—'}
           </span>
         </div>
 
@@ -138,10 +133,15 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>{tx.paymentMethod}</span>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', padding: '14px 0' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Description</span>
-          <span style={{ color: 'var(--text-main)', fontSize: '13px', lineHeight: '1.4' }}>
-            {tx.description || 'No note added.'}
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Date</span>
+          <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>{tx.date}</span>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Type</span>
+          <span style={{ color: tx.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)', fontSize: '13px', fontWeight: '700' }}>
+            {tx.type}
           </span>
         </div>
       </div>

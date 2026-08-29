@@ -30,6 +30,8 @@ router.get('/', authenticateToken, async (req, res) => {
     if (search) {
       const searchRegex = new RegExp(search, 'i');
       query.$or = [
+        { transactionName: searchRegex },
+        { name: searchRegex },
         { category: searchRegex },
         { description: searchRegex },
         { paymentMethod: searchRegex }
@@ -46,7 +48,7 @@ router.get('/', authenticateToken, async (req, res) => {
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .select('id type amount category paymentMethod description date createdAt')
+        .select('id type amount name transactionName category paymentMethod description date createdAt')
         .lean(),
       Transaction.countDocuments(query)
     ]);
@@ -85,7 +87,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // CREATE TRANSACTION
 router.post('/', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-  const { type, amount, category, paymentMethod, description, date } = req.body;
+  const { type, amount, name, transactionName, category, paymentMethod, description, date } = req.body;
 
   if (!type || !['INCOME', 'EXPENSE'].includes(type)) {
     return res.status(400).json({ error: 'Valid transaction type (INCOME or EXPENSE) is required' });
@@ -107,20 +109,26 @@ router.post('/', authenticateToken, async (req, res) => {
   const txDate = date || new Date().toISOString().split('T')[0];
   const txId = crypto.randomUUID();
 
+  // Sanitize description string and extract name
+  const cleanDescription = (description && description.trim() !== 'string') ? description.trim() : '';
+  const cleanName = (transactionName !== undefined ? transactionName : (name || '')).trim();
+
   try {
     const newTx = new Transaction({
       id: txId,
       userId,
       type,
       amount: numericAmount,
+      transactionName: cleanName,
+      name: cleanName,
       category: category.trim(),
       paymentMethod,
-      description: description ? description.trim() : '',
+      description: cleanDescription,
       date: txDate
     });
 
     await newTx.save();
-    await recalculateDailyClosingsFrom(userId, txDate);
+    recalculateDailyClosingsFrom(userId, txDate).catch(err => console.error('Background closing recalculation error:', err));
 
     return res.json({
       message: 'Transaction saved successfully',
@@ -136,7 +144,7 @@ router.post('/', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
-  const { type, amount, category, paymentMethod, description, date } = req.body;
+  const { type, amount, name, transactionName, category, paymentMethod, description, date } = req.body;
 
   try {
     const existing = await Transaction.findOne({ id, userId });
@@ -151,14 +159,21 @@ router.put('/:id', authenticateToken, async (req, res) => {
       if (isNaN(num) || num <= 0) return res.status(400).json({ error: 'Amount must be a positive number' });
       existing.amount = num;
     }
+    if (transactionName !== undefined || name !== undefined) {
+      const updatedName = (transactionName !== undefined ? transactionName : name).trim();
+      existing.transactionName = updatedName;
+      existing.name = updatedName;
+    }
     if (category) existing.category = category.trim();
     if (paymentMethod) existing.paymentMethod = paymentMethod;
-    if (description !== undefined) existing.description = description.trim();
+    if (description !== undefined) {
+      existing.description = (description && description.trim() !== 'string') ? description.trim() : '';
+    }
     if (date) existing.date = date;
     existing.updatedAt = new Date();
 
     await existing.save();
-    await recalculateDailyClosingsFrom(userId, oldDate < existing.date ? oldDate : existing.date);
+    recalculateDailyClosingsFrom(userId, oldDate < existing.date ? oldDate : existing.date).catch(err => console.error('Background closing recalculation error:', err));
 
     return res.json({
       message: 'Transaction updated successfully',
@@ -179,7 +194,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     if (!deleted) {
       return res.status(404).json({ error: 'Transaction not found' });
     }
-    await recalculateDailyClosingsFrom(userId, deleted.date);
+    recalculateDailyClosingsFrom(userId, deleted.date).catch(err => console.error('Background closing recalculation error:', err));
     return res.json({ message: 'Transaction deleted successfully', id });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to delete transaction' });
