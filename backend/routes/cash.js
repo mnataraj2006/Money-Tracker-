@@ -107,7 +107,7 @@ router.get('/expected', authenticateToken, async (req, res) => {
 
 async function recalculateDailyClosingsFrom(userId, startDate) {
   try {
-    await autoClosePastDays(userId);
+    autoClosePastDays(userId).catch(err => console.error('Background autoClosePastDays error:', err));
 
     const affectedClosings = await DailyClosing.find({
       userId,

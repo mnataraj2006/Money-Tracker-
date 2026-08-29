@@ -1,0 +1,556 @@
+/* Simple Passbook View - Senior-Friendly Tamil Ledger UI */
+
+.passbook-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  background-color: #f4f6f8;
+  color: #1a1a1a;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  position: relative;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+/* Top Header Bar */
+.passbook-header {
+  background: #ffffff;
+  border-bottom: 1px solid #e0e0e0;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.passbook-title-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.passbook-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #1b5e20;
+}
+
+.passbook-mode-badge {
+  background-color: #e8f5e9;
+  color: #2e7d32;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 8px;
+  border-radius: 12px;
+  border: 1px solid #a5d6a7;
+}
+
+.passbook-switch-btn {
+  background: #f5f5f5;
+  border: 1px solid #cccccc;
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333333;
+  cursor: pointer;
+}
+
+/* Date Navigator Bar */
+.passbook-date-nav {
+  background: #e8f5e9;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #c8e6c9;
+}
+
+.passbook-arrow-btn {
+  background: #ffffff;
+  border: 1px solid #a5d6a7;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #1b5e20;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.passbook-arrow-btn:active {
+  background: #c8e6c9;
+}
+
+.passbook-date-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.passbook-date-text {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1b5e20;
+}
+
+.passbook-today-chip {
+  background: #2e7d32;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+/* Balance Area */
+.passbook-balance-banner {
+  background: #ffffff;
+  padding: 14px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.passbook-balance-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #666666;
+}
+
+.passbook-balance-amount {
+  font-size: 24px;
+  font-weight: 800;
+  color: #111111;
+}
+
+/* Ledger List Container */
+.passbook-ledger {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding-bottom: 90px;
+}
+
+/* Income & Expense Card Sections */
+.passbook-section {
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px solid #e0e0e0;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+}
+
+.passbook-section-header {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.passbook-section-header.income {
+  background-color: #f1f8e9;
+  border-bottom: 1px solid #c8e6c9;
+}
+
+.passbook-section-header.expense {
+  background-color: #fbe9e7;
+  border-bottom: 1px solid #ffccbc;
+}
+
+.passbook-section-title {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.passbook-section-title.income {
+  color: #2e7d32;
+}
+
+.passbook-section-title.expense {
+  color: #c62828;
+}
+
+.passbook-section-total {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.passbook-section-total.income {
+  color: #2e7d32;
+}
+
+.passbook-section-total.expense {
+  color: #c62828;
+}
+
+/* Transaction List Rows */
+.passbook-row-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.passbook-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  min-height: 56px;
+}
+
+.passbook-row:last-child {
+  border-bottom: none;
+}
+
+.passbook-row:active {
+  background-color: #f5f5f5;
+}
+
+.passbook-row-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.passbook-row-category {
+  font-size: 16px;
+  font-weight: 700;
+  color: #222222;
+}
+
+.passbook-row-desc {
+  font-size: 13px;
+  color: #666666;
+}
+
+.passbook-row-right {
+  font-size: 18px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.passbook-row-right.income {
+  color: #2e7d32;
+}
+
+.passbook-row-right.expense {
+  color: #333333;
+}
+
+/* Empty State */
+.passbook-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #777777;
+  font-size: 15px;
+  background: #ffffff;
+  border-radius: 10px;
+  border: 1px dashed #cccccc;
+}
+
+/* Voice Quick Button Bar */
+.passbook-voice-bar {
+  background: #e3f2fd;
+  border: 1px solid #bbdefb;
+  border-radius: 10px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.passbook-voice-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #1565c0;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.passbook-voice-mic-icon {
+  background: #1976d2;
+  color: #ffffff;
+  border-radius: 50%;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Floating Action Button (+) */
+.passbook-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background-color: #25d366;
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  cursor: pointer;
+  z-index: 99;
+}
+
+.passbook-fab:active {
+  transform: scale(0.95);
+  background-color: #1ebd59;
+}
+
+/* Bottom Sheet Overlay */
+.sheet-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  z-index: 1000;
+}
+
+.sheet-container {
+  background: #ffffff;
+  width: 100%;
+  max-width: 600px;
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  padding: 20px;
+  box-sizing: border-box;
+  animation: slideUp 0.25s ease-out forwards;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.sheet-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.sheet-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #111111;
+}
+
+.sheet-close-btn {
+  background: #f0f0f0;
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #555555;
+}
+
+/* Toggle Switch (வரவு | செலவு) */
+.type-toggle-bar {
+  display: flex;
+  background: #f0f0f0;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 20px;
+  border: 1px solid #dddddd;
+}
+
+.type-toggle-btn {
+  flex: 1;
+  padding: 12px 0;
+  border: none;
+  border-radius: 8px;
+  font-size: 17px;
+  font-weight: 800;
+  cursor: pointer;
+  background: transparent;
+  color: #666666;
+  transition: all 0.15s ease;
+}
+
+.type-toggle-btn.active.income {
+  background: #ffffff;
+  color: #2e7d32;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #a5d6a7;
+}
+
+.type-toggle-btn.active.expense {
+  background: #ffffff;
+  color: #c62828;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border: 1px solid #ef9a9a;
+}
+
+/* Form Groups */
+.sheet-field-group {
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sheet-field-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: #333333;
+}
+
+.sheet-input {
+  width: 100%;
+  padding: 14px 16px;
+  font-size: 18px;
+  border: 1.5px solid #cccccc;
+  border-radius: 10px;
+  box-sizing: border-box;
+  outline: none;
+  color: #111111;
+  background: #fafafa;
+}
+
+.sheet-input:focus {
+  border-color: #2e7d32;
+  background: #ffffff;
+}
+
+.sheet-input.amount {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+/* Save / Delete Buttons */
+.sheet-save-btn {
+  width: 100%;
+  padding: 16px;
+  background: #2e7d32;
+  color: #ffffff;
+  border: none;
+  border-radius: 12px;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  margin-top: 10px;
+  min-height: 54px;
+}
+
+.sheet-save-btn:active {
+  background: #1b5e20;
+}
+
+.sheet-save-btn:disabled {
+  background: #a5d6a7;
+  cursor: not-allowed;
+}
+
+.sheet-delete-btn {
+  width: 100%;
+  padding: 14px;
+  background: #fff0f0;
+  color: #d32f2f;
+  border: 1px solid #ffcdd2;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 12px;
+  min-height: 48px;
+}
+
+.sheet-delete-btn:active {
+  background: #ffe0e0;
+}
+
+/* Delete Confirmation Modal Overlay */
+.confirm-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+  padding: 20px;
+}
+
+.confirm-box {
+  background: #ffffff;
+  border-radius: 14px;
+  padding: 20px;
+  width: 100%;
+  max-width: 380px;
+  text-align: center;
+}
+
+.confirm-text {
+  font-size: 17px;
+  font-weight: 700;
+  margin-bottom: 20px;
+  color: #222222;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.confirm-btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  min-height: 48px;
+}
+
+.confirm-btn.cancel {
+  background: #e0e0e0;
+  color: #333333;
+}
+
+.confirm-btn.delete {
+  background: #d32f2f;
+  color: #ffffff;
+}

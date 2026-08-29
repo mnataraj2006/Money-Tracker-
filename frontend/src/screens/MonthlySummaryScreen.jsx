@@ -31,8 +31,8 @@ export default function MonthlySummaryScreen({ month = '2026-08', onBack, user }
   const cashExpenses = data?.cashExpenses ?? 0;
   const incomePercent = data?.incomePercent ?? 50;
   const expensePercent = data?.expensePercent ?? 50;
-  const topCategory = data?.topExpenseCategory || 'None';
-  const categories = data?.categoryBreakdown || [];
+  const topExpense = data?.topExpenseItem || data?.topExpenseCategory || 'None';
+  const expensesList = data?.expenseBreakdown || data?.categoryBreakdown || [];
 
   return (
     <div className="screen-container">
@@ -151,10 +151,10 @@ export default function MonthlySummaryScreen({ month = '2026-08', onBack, user }
         </div>
       </div>
 
-      {/* Expense by Category Card */}
+      {/* Top Expenses Card */}
       <div className="stitch-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
         <div style={{ width: '100%', fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>
-          Expense by Category
+          Top Expenses
         </div>
 
         {/* Donut Summary Visual Circle */}
@@ -169,23 +169,24 @@ export default function MonthlySummaryScreen({ month = '2026-08', onBack, user }
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          textAlign: 'center'
+          textAlign: 'center',
+          padding: '12px'
         }}>
           <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Top Expense</div>
-          <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--navy-primary)' }}>{topCategory}</div>
+          <div style={{ fontSize: '16px', fontWeight: '800', color: 'var(--navy-primary)', wordBreak: 'break-word', maxWidth: '140px' }}>{topExpense}</div>
         </div>
 
-        {/* Category List */}
+        {/* Expense Items List */}
         <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
-          {categories.length === 0 ? (
+          {expensesList.length === 0 ? (
             <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '12px 0' }}>
               No expenses recorded for this month.
             </div>
           ) : (
-            categories.map((c) => (
-              <div key={c.category} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            expensesList.map((c, idx) => (
+              <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: '600' }}>
-                  ● {c.category} ({c.percentage}%)
+                  ● {c.name || c.category} ({c.percentage}%)
                 </div>
                 <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>
                   {formatCurrency(c.amount)}

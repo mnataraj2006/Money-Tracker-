@@ -101,14 +101,9 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
     });
   };
 
-  const getCategoryIcon = (category) => {
-    const cat = (category || '').toLowerCase();
-    if (cat.includes('salary') || cat.includes('income')) return <Briefcase size={18} color="#16A34A" />;
-    if (cat.includes('food') || cat.includes('breakfast') || cat.includes('lunch') || cat.includes('dinner')) return <Utensils size={18} color="#DC2626" />;
-    if (cat.includes('grocery') || cat.includes('shopping')) return <ShoppingBag size={18} color="#DC2626" />;
-    if (cat.includes('coffee') || cat.includes('tea')) return <Coffee size={18} color="#DC2626" />;
-    if (cat.includes('bank') || cat.includes('transfer')) return <Landmark size={18} color="#16247B" />;
-    return <CreditCard size={18} color="#16247B" />;
+  const getTransactionIcon = (tx) => {
+    if (tx?.type === 'INCOME') return <ArrowDown size={18} color="#16A34A" />;
+    return <ArrowUp size={18} color="#DC2626" />;
   };
 
   // Extract Cash & Count Status
@@ -631,14 +626,14 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                       alignItems: 'center',
                       justifyContent: 'center'
                     }}>
-                      {getCategoryIcon(tx.category)}
+                      {getTransactionIcon(tx)}
                     </div>
                     <div>
                       <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
                         {tx.transactionName || tx.name || t('unnamedTransaction')}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                        Today • {tx.paymentMethod} • {tx.category}
+                        Today • {tx.paymentMethod}
                       </div>
                     </div>
                   </div>

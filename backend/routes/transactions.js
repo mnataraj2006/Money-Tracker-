@@ -32,7 +32,6 @@ router.get('/', authenticateToken, async (req, res) => {
       query.$or = [
         { transactionName: searchRegex },
         { name: searchRegex },
-        { category: searchRegex },
         { description: searchRegex },
         { paymentMethod: searchRegex }
       ];
@@ -98,9 +97,6 @@ router.post('/', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Amount must be a positive number greater than 0' });
   }
 
-  if (!category || !category.trim()) {
-    return res.status(400).json({ error: 'Category is required' });
-  }
 
   if (!paymentMethod || !['CASH', 'UPI', 'BANK', 'CARD', 'OTHER'].includes(paymentMethod)) {
     return res.status(400).json({ error: 'Valid payment method is required' });
@@ -121,7 +117,7 @@ router.post('/', authenticateToken, async (req, res) => {
       amount: numericAmount,
       transactionName: cleanName,
       name: cleanName,
-      category: category.trim(),
+      category: (category || '').trim(),
       paymentMethod,
       description: cleanDescription,
       date: txDate
@@ -164,7 +160,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       existing.transactionName = updatedName;
       existing.name = updatedName;
     }
-    if (category) existing.category = category.trim();
+    if (category !== undefined) existing.category = (category || '').trim();
     if (paymentMethod) existing.paymentMethod = paymentMethod;
     if (description !== undefined) {
       existing.description = (description && description.trim() !== 'string') ? description.trim() : '';

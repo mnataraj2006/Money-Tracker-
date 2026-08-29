@@ -110,7 +110,7 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           fontSize: '12px',
           fontWeight: '700'
         }}>
-          {tx.date} • {tx.paymentMethod} • {tx.category}
+          {tx.date} • {tx.paymentMethod}
         </div>
       </div>
 
@@ -123,10 +123,6 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           </span>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Category</span>
-          <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>{tx.category}</span>
-        </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
           <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Payment Method</span>

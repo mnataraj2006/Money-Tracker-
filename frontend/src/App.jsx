@@ -15,6 +15,7 @@ import HistoryScreen from './screens/HistoryScreen';
 import MonthlySummaryScreen from './screens/MonthlySummaryScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import DailyDetailsScreen from './screens/DailyDetailsScreen';
+import SimplePassbookView from './screens/SimplePassbookView';
 import { authAPI, settingsAPI } from './services/api';
 import { LanguageProvider } from './context/LanguageContext';
 import { DataProvider } from './context/DataContext';
@@ -25,6 +26,7 @@ function AppContent() {
   const [currentScreen, setCurrentScreen] = useState('login');
   const [screenParams, setScreenParams] = useState({});
   const [activeTab, setActiveTab] = useState('home');
+  const [viewMode, setViewMode] = useState(() => localStorage.getItem('money_tracker_app_view') || 'normal');
 
   useEffect(() => {
     checkAuth();
@@ -128,17 +130,26 @@ function AppContent() {
           activeTab={activeTab}
           onTabChange={handleTabChange}
         >
-          {currentScreen === 'home' && <HomeScreen user={user} onNavigate={navigateTo} />}
+          {currentScreen === 'home' && <HomeScreen user={user} onNavigate={navigateTo} viewMode={viewMode} />}
           {currentScreen === 'transactions' && <TransactionsScreen user={user} onNavigate={navigateTo} />}
           {currentScreen === 'cash' && <CashAtHomeScreen user={user} onNavigate={navigateTo} />}
           {currentScreen === 'history' && <HistoryScreen user={user} onNavigate={navigateTo} />}
-          {currentScreen === 'settings' && <SettingsScreen user={user} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />}
+          {currentScreen === 'settings' && (
+            <SettingsScreen
+              user={user}
+              onLogout={handleLogout}
+              onUpdateUser={handleUpdateUser}
+              viewMode={viewMode}
+              onViewModeChange={(mode) => setViewMode(mode)}
+            />
+          )}
         </AppShell>
       ) : (
         <>
           {currentScreen === 'add-income' && (
             <AddIncomeScreen
               initialDate={screenParams.date}
+              editTx={screenParams.editTx}
               onBack={() => navigateTo(screenParams.from || 'home')}
               onSuccess={() => navigateTo(screenParams.from || 'transactions')}
             />
@@ -147,6 +158,7 @@ function AppContent() {
           {currentScreen === 'add-expense' && (
             <AddExpenseScreen
               initialDate={screenParams.date}
+              editTx={screenParams.editTx}
               onBack={() => navigateTo(screenParams.from || 'home')}
               onSuccess={() => navigateTo(screenParams.from || 'transactions')}
             />

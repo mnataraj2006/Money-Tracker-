@@ -113,7 +113,6 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
       setSelectedTx(null);
       setVoicePreset({
         type: parsedData.type || 'EXPENSE',
-        category: parsedData.category || '',
         amount: parsedData.amount || '',
         note: parsedData.note || ''
       });
@@ -218,7 +217,7 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
                       onClick={() => handleOpenEditSheet(tx)}
                     >
                       <div className="passbook-row-left">
-                        <span className="passbook-row-category">
+                        <span className="passbook-row-title">
                           {tx.transactionName || tx.name || t('unnamedTransaction')}
                         </span>
                         {tx.description && (
@@ -256,7 +255,7 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
                       onClick={() => handleOpenEditSheet(tx)}
                     >
                       <div className="passbook-row-left">
-                        <span className="passbook-row-category">
+                        <span className="passbook-row-title">
                           {tx.transactionName || tx.name || t('unnamedTransaction')}
                         </span>
                         {tx.description && (
@@ -302,7 +301,6 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
         initialDate={currentDate}
         editTx={selectedTx}
         presetType={voicePreset?.type}
-        presetCategory={voicePreset?.category}
         presetAmount={voicePreset?.amount}
         presetNote={voicePreset?.note}
       />

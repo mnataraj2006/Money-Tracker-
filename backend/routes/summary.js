@@ -306,11 +306,18 @@ router.get('/monthly-summary', authenticateToken, async (req, res) => {
         { $match: { userId, date: monthRegex, type: 'EXPENSE' } },
         {
           $group: {
-            _id: '$category',
+            _id: {
+              $cond: [
+                { $gt: [{ $strLenCP: { $ifNull: ['$transactionName', ''] } }, 0] },
+                '$transactionName',
+                { $ifNull: ['$name', 'Expense'] }
+              ]
+            },
             amount: { $sum: '$amount' }
           }
         },
-        { $sort: { amount: -1 } }
+        { $sort: { amount: -1 } },
+        { $limit: 10 }
       ])
     ]);
 
@@ -325,8 +332,9 @@ router.get('/monthly-summary', authenticateToken, async (req, res) => {
     const incomePercent = totalFlow > 0 ? Math.round((totalIncome / totalFlow) * 100) : 50;
     const expensePercent = totalFlow > 0 ? 100 - incomePercent : 50;
 
-    const categoryBreakdown = categoriesAgg.map(cat => ({
-      category: cat._id,
+    const expenseBreakdown = categoriesAgg.map(cat => ({
+      name: cat._id || 'Expense',
+      category: cat._id || 'Expense',
       amount: cat.amount,
       percentage: totalExpenses > 0 ? Math.round((cat.amount / totalExpenses) * 100) : 0
     }));
@@ -340,8 +348,10 @@ router.get('/monthly-summary', authenticateToken, async (req, res) => {
       cashExpenses,
       incomePercent,
       expensePercent,
-      categoryBreakdown,
-      topExpenseCategory: categoryBreakdown.length > 0 ? categoryBreakdown[0].category : 'None'
+      expenseBreakdown,
+      categoryBreakdown: expenseBreakdown,
+      topExpenseItem: expenseBreakdown.length > 0 ? expenseBreakdown[0].name : 'None',
+      topExpenseCategory: expenseBreakdown.length > 0 ? expenseBreakdown[0].name : 'None'
     });
   } catch (err) {
     console.error('Error generating monthly summary:', err);

@@ -72,13 +72,9 @@ export default function TransactionsScreen({ onNavigate, user }) {
 
   const formatCurrency = (val) => `₹${(val || 0).toLocaleString('en-IN')}`;
 
-  const getCategoryIcon = (category, type) => {
-    const cat = (category || '').toLowerCase();
-    if (cat.includes('salary') || cat.includes('income')) return <Briefcase size={18} color="#16A34A" />;
-    if (cat.includes('food') || cat.includes('breakfast')) return <Utensils size={18} color="#DC2626" />;
-    if (cat.includes('grocery') || cat.includes('shopping')) return <ShoppingBag size={18} color="#DC2626" />;
-    if (cat.includes('coffee')) return <Coffee size={18} color="#DC2626" />;
-    return <CreditCard size={18} color={type === 'INCOME' ? '#16A34A' : '#DC2626'} />;
+  const getTransactionIcon = (tx) => {
+    if (tx?.type === 'INCOME') return <Briefcase size={18} color="#16A34A" />;
+    return <CreditCard size={18} color="#DC2626" />;
   };
 
   // Group transactions by Date
@@ -375,14 +371,14 @@ export default function TransactionsScreen({ onNavigate, user }) {
                         alignItems: 'center',
                         justifyContent: 'center'
                       }}>
-                        {getCategoryIcon(tx.category, tx.type)}
+                        {getTransactionIcon(tx)}
                       </div>
                       <div>
                         <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
                           {tx.transactionName || tx.name || t('unnamedTransaction')}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                          {dateStr} • {tx.paymentMethod}{tx.category ? ` • ${tx.category}` : ''}{tx.description ? ` • ${tx.description}` : ''}
+                          {dateStr} • {tx.paymentMethod}{tx.description ? ` • ${tx.description}` : ''}
                         </div>
                       </div>
                     </div>

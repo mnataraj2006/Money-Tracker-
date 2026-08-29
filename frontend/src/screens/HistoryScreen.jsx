@@ -159,12 +159,8 @@ export default function HistoryScreen({ user, onNavigate }) {
     return `${day} ${monthName} ${year}`;
   };
 
-  const getCategoryIcon = (category) => {
-    const cat = (category || '').toLowerCase();
-    if (cat.includes('salary') || cat.includes('income')) return <Briefcase size={16} color="#16A34A" />;
-    if (cat.includes('food') || cat.includes('breakfast')) return <Utensils size={16} color="#DC2626" />;
-    if (cat.includes('grocery') || cat.includes('shopping')) return <ShoppingBag size={16} color="#DC2626" />;
-    if (cat.includes('coffee')) return <Coffee size={16} color="#DC2626" />;
+  const getTransactionIcon = (tx) => {
+    if (tx?.type === 'INCOME') return <Briefcase size={16} color="#16A34A" />;
     return <CreditCard size={16} color="var(--navy-primary)" />;
   };
 
@@ -257,14 +253,14 @@ export default function HistoryScreen({ user, onNavigate }) {
               <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--green-income-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {getCategoryIcon(tx.category)}
+                    {getTransactionIcon(tx)}
                   </div>
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>
                       {tx.transactionName || tx.name || t('unnamedTransaction')}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      {tx.paymentMethod} • {tx.category}
+                      {tx.paymentMethod}{tx.description ? ` • ${tx.description}` : ''}
                     </div>
                   </div>
                 </div>
@@ -291,14 +287,14 @@ export default function HistoryScreen({ user, onNavigate }) {
               <div key={tx.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--border-color)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                   <div style={{ width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--red-expense-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {getCategoryIcon(tx.category)}
+                    {getTransactionIcon(tx)}
                   </div>
                   <div>
                     <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>
                       {tx.transactionName || tx.name || t('unnamedTransaction')}
                     </div>
                     <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                      {tx.paymentMethod} • {tx.category}
+                      {tx.paymentMethod}{tx.description ? ` • ${tx.description}` : ''}
                     </div>
                   </div>
                 </div>

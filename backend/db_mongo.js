@@ -52,7 +52,7 @@ const transactionSchema = new mongoose.Schema({
   amount: { type: Number, required: true, min: 0.01 },
   transactionName: { type: String, default: '' },
   name: { type: String, default: '' },
-  category: { type: String, required: true },
+  category: { type: String, default: '' },
   paymentMethod: { type: String, enum: ['CASH', 'UPI', 'BANK', 'CARD', 'OTHER'], required: true },
   description: { type: String, default: '' },
   date: { type: String, required: true, index: true }, // YYYY-MM-DD

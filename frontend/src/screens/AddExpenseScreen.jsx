@@ -8,7 +8,6 @@ export default function AddExpenseScreen({ onBack, onSuccess, initialDate, editT
   const { clearCache } = useDataCache();
   const [amount, setAmount] = useState(editTx ? editTx.amount : '');
   const [name, setName] = useState(editTx ? (editTx.transactionName || editTx.name || '') : '');
-  const [category, setCategory] = useState(editTx ? editTx.category : 'General');
   const [paymentMethod, setPaymentMethod] = useState(editTx ? editTx.paymentMethod : 'CASH');
   const [date, setDate] = useState(editTx ? editTx.date : (initialDate || new Date().toISOString().split('T')[0]));
   const [note, setNote] = useState(editTx ? (editTx.description === 'string' ? '' : (editTx.description || '')) : '');
@@ -39,7 +38,6 @@ export default function AddExpenseScreen({ onBack, onSuccess, initialDate, editT
           amount: numAmount,
           transactionName: name.trim(),
           name: name.trim(),
-          category,
           paymentMethod,
           description: note,
           date
@@ -50,7 +48,6 @@ export default function AddExpenseScreen({ onBack, onSuccess, initialDate, editT
           amount: numAmount,
           transactionName: name.trim(),
           name: name.trim(),
-          category,
           paymentMethod,
           description: note,
           date
@@ -154,27 +151,6 @@ export default function AddExpenseScreen({ onBack, onSuccess, initialDate, editT
           />
         </div>
 
-        {/* Category Input */}
-        <div className="input-group">
-          <label className="input-label">Category</label>
-          <select
-            className="input-control"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <option value="General">General</option>
-            <option value="Groceries">Groceries</option>
-            <option value="Food & Dining">Food & Dining</option>
-            <option value="Breakfast">Breakfast</option>
-            <option value="Housing & Rent">Housing & Rent</option>
-            <option value="Shopping">Shopping</option>
-            <option value="Utilities & Bills">Utilities & Bills</option>
-            <option value="Transport & Fuel">Transport & Fuel</option>
-            <option value="Entertainment">Entertainment</option>
-            <option value="Health & Medical">Health & Medical</option>
-            <option value="Other Expense">Other Expense</option>
-          </select>
-        </div>
 
         {/* Payment Method Input */}
         <div className="input-group">

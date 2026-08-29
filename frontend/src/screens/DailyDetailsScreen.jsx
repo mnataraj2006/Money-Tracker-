@@ -330,12 +330,11 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
                           {getCategoryIcon(tx.category)}
                         </div>
                         <div>
-                          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>{tx.category}</div>
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>
+                            {(tx.description && tx.description.trim()) ? tx.description.trim() : tx.category}
+                          </div>
                           <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                            {tx.description ? `${tx.description} • ` : ''}
-                            <span style={{ fontWeight: '700', color: isCash ? 'var(--navy-primary)' : 'var(--text-secondary)' }}>
-                              {tx.paymentMethod}
-                            </span>
+                            {tx.paymentMethod} • {tx.category}
                           </div>
                         </div>
                       </div>
@@ -398,12 +397,11 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
                           {getCategoryIcon(tx.category)}
                         </div>
                         <div>
-                          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>{tx.category}</div>
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>
+                            {(tx.description && tx.description.trim()) ? tx.description.trim() : tx.category}
+                          </div>
                           <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                            {tx.description ? `${tx.description} • ` : ''}
-                            <span style={{ fontWeight: '700', color: isCash ? 'var(--navy-primary)' : 'var(--text-secondary)' }}>
-                              {tx.paymentMethod}
-                            </span>
+                            {tx.paymentMethod} • {tx.category}
                           </div>
                         </div>
                       </div>

@@ -1,13 +1,27 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, User, Lock, LogOut, RefreshCw, Grid, Moon, Database, ChevronRight, Globe, Check, Download, Upload, Edit2 } from 'lucide-react';
+import { Bell, User, Lock, LogOut, RefreshCw, Grid, Moon, Database, ChevronRight, Globe, Check, Download, Upload, Edit2, Mic } from 'lucide-react';
 import { authAPI, settingsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import PageContainer from '../components/PageContainer';
 
-export default function SettingsScreen({ user, onLogout, onUpdateUser }) {
+export default function SettingsScreen({ user, onLogout, onUpdateUser, viewMode = 'normal', onViewModeChange }) {
   const { language, setLanguage, t } = useLanguage();
   const [currency, setCurrency] = useState('INR (₹)');
   const [notifications, setNotifications] = useState(true);
+  const [voiceLang, setVoiceLang] = useState(() => localStorage.getItem('cashly_voice_lang') || 'auto');
+  const [activeViewMode, setActiveViewMode] = useState(viewMode);
+
+  useEffect(() => {
+    setActiveViewMode(viewMode);
+  }, [viewMode]);
+
+  const handleModeToggle = (newMode) => {
+    setActiveViewMode(newMode);
+    localStorage.setItem('money_tracker_app_view', newMode);
+    if (onViewModeChange) {
+      onViewModeChange(newMode);
+    }
+  };
 
   // Modals
   const [showProfileModal, setShowProfileModal] = useState(false);
@@ -189,6 +203,70 @@ export default function SettingsScreen({ user, onLogout, onUpdateUser }) {
           | {t('application')}
         </div>
 
+        {/* App View Mode Selection */}
+        <div style={{ padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ fontSize: '15px', color: 'var(--text-main)', fontWeight: '700', marginBottom: '4px' }}>
+            App View
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            Choose how you want to use the app.
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <label
+              onClick={() => handleModeToggle('normal')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                border: activeViewMode === 'normal' ? '2px solid #16A34A' : '1px solid #CBD5E1',
+                background: activeViewMode === 'normal' ? '#F0FDF4' : '#FFFFFF',
+                cursor: 'pointer',
+                fontWeight: '700',
+                fontSize: '14px',
+                color: activeViewMode === 'normal' ? '#166534' : '#334155'
+              }}
+            >
+              <input
+                type="radio"
+                name="appViewMode"
+                checked={activeViewMode === 'normal'}
+                onChange={() => handleModeToggle('normal')}
+                style={{ accentColor: '#16A34A', width: '18px', height: '18px' }}
+              />
+              Normal Mode
+            </label>
+
+            <label
+              onClick={() => handleModeToggle('simple')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '10px',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                border: activeViewMode === 'simple' ? '2px solid #16A34A' : '1px solid #CBD5E1',
+                background: activeViewMode === 'simple' ? '#F0FDF4' : '#FFFFFF',
+                cursor: 'pointer',
+                fontWeight: '700',
+                fontSize: '14px',
+                color: activeViewMode === 'simple' ? '#166534' : '#334155'
+              }}
+            >
+              <input
+                type="radio"
+                name="appViewMode"
+                checked={activeViewMode === 'simple'}
+                onChange={() => handleModeToggle('simple')}
+                style={{ accentColor: '#16A34A', width: '18px', height: '18px' }}
+              />
+              Simple Passbook Mode
+            </label>
+          </div>
+        </div>
+
         {/* Language Switcher Option */}
         <div
           onClick={() => setShowLanguageModal(true)}
@@ -200,6 +278,34 @@ export default function SettingsScreen({ user, onLogout, onUpdateUser }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: 'var(--navy-primary)', fontWeight: '700' }}>
             {language === 'ta' ? 'தமிழ் (Tamil)' : 'English'} <ChevronRight size={16} />
           </div>
+        </div>
+
+        {/* Voice Language Preference */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '14px', color: 'var(--text-main)', fontWeight: '600' }}>
+            <Mic size={18} color="#021A1A" /> {t('voiceLanguage') || 'Voice Language'}
+          </div>
+          <select
+            value={voiceLang}
+            onChange={(e) => {
+              const val = e.target.value;
+              setVoiceLang(val);
+              localStorage.setItem('cashly_voice_lang', val);
+            }}
+            style={{
+              padding: '6px 10px',
+              borderRadius: '8px',
+              border: '1px solid #CBD5E1',
+              fontSize: '13px',
+              fontWeight: '700',
+              backgroundColor: '#FFF',
+              color: '#021A1A'
+            }}
+          >
+            <option value="auto">Auto ({t('autoDetect') || 'Auto'})</option>
+            <option value="ta">தமிழ் (Tamil)</option>
+            <option value="en">English</option>
+          </select>
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
