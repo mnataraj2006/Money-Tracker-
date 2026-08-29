@@ -148,16 +148,13 @@ export default function TransactionNameAutocomplete({
     };
   }, []);
 
-  // Compute smart ranked suggestions based on input
+  // Compute smart ranked suggestions based on input (STRICTLY when input is not empty)
   const suggestions = useMemo(() => {
     const query = (value || '').trim().toLowerCase().normalize('NFC');
 
-    // If query is empty, return up to 3 recent user entries
-    if (!query) {
-      return historyItems
-        .filter((item) => item.isUserHistory)
-        .slice(0, 3)
-        .map((item) => item.name);
+    // Strictly NO suggestions if the input is empty
+    if (!query || query.length === 0) {
+      return [];
     }
 
     const scored = [];
@@ -199,13 +196,21 @@ export default function TransactionNameAutocomplete({
   const handleInputChange = (e) => {
     const newVal = e.target.value;
     onChange(newVal);
-    setIsOpen(true);
+    if (newVal.trim().length >= 1) {
+      setIsOpen(true);
+    } else {
+      setIsOpen(false);
+    }
     setSelectedIndex(-1);
   };
 
   const handleFocus = () => {
-    if (suggestions.length > 0) {
+    // Only open if the user has already typed at least 1 character
+    const query = (value || '').trim();
+    if (query.length >= 1 && suggestions.length > 0) {
       setIsOpen(true);
+    } else {
+      setIsOpen(false);
     }
   };
 
@@ -213,14 +218,12 @@ export default function TransactionNameAutocomplete({
     onChange(suggestion);
     setIsOpen(false);
     setSelectedIndex(-1);
-    if (inputRef.current) {
-      inputRef.current.focus();
-    }
   };
 
   const handleKeyDown = (e) => {
-    if (!isOpen || suggestions.length === 0) {
-      if (e.key === 'ArrowDown') {
+    const query = (value || '').trim();
+    if (!isOpen || query.length === 0 || suggestions.length === 0) {
+      if (e.key === 'ArrowDown' && query.length >= 1 && suggestions.length > 0) {
         setIsOpen(true);
       }
       return;
@@ -274,8 +277,8 @@ export default function TransactionNameAutocomplete({
         }}
       />
 
-      {/* Suggestion Dropdown */}
-      {isOpen && suggestions.length > 0 && (
+      {/* Suggestion Dropdown (Only when input has at least 1 character) */}
+      {isOpen && (value || '').trim().length >= 1 && suggestions.length > 0 && (
         <div
           style={{
             position: 'absolute',
