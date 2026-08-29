@@ -435,18 +435,18 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                     <div
                       key={tx.id}
                       onClick={() => handleOpenEditTx(tx)}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #F1F5F9', cursor: 'pointer' }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F1F5F9', cursor: 'pointer' }}
                     >
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B', wordBreak: 'break-word' }}>
                           {tx.transactionName || tx.name || t('unnamedTransaction')}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#64748B' }}>
+                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
                           {tx.createdAt ? new Date(tx.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : t('today')}
                         </div>
                       </div>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#16A34A' }}>
-                        {formatCurrency(tx.amount)}
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#16A34A', flexShrink: 0, textAlign: 'right' }}>
+                        +{formatCurrency(tx.amount)}
                       </div>
                     </div>
                   ))
@@ -505,18 +505,18 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                     <div
                       key={tx.id}
                       onClick={() => handleOpenEditTx(tx)}
-                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #F1F5F9', cursor: 'pointer' }}
+                      style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F1F5F9', cursor: 'pointer' }}
                     >
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
+                      <div style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
+                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B', wordBreak: 'break-word' }}>
                           {tx.transactionName || tx.name || t('unnamedTransaction')}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#64748B' }}>
+                        <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
                           {tx.createdAt ? new Date(tx.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : t('today')}
                         </div>
                       </div>
-                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#334155' }}>
-                        {formatCurrency(tx.amount)}
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#DC2626', flexShrink: 0, textAlign: 'right' }}>
+                        -{formatCurrency(tx.amount)}
                       </div>
                     </div>
                   ))
@@ -602,8 +602,8 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                 </div>
               </div>
             ) : (
-              /* Recent Transactions List */
-              data.recentTransactions.slice(0, 5).map((tx) => (
+              /* Recent Transactions List (All Today's Transactions) */
+              data.recentTransactions.map((tx) => (
                 <div
                   key={tx.id}
                   className="stitch-card"
@@ -616,7 +616,7 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                     cursor: 'pointer'
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flex: 1, minWidth: 0, paddingRight: '12px' }}>
                     <div style={{
                       width: '40px',
                       height: '40px',
@@ -624,21 +624,22 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                       backgroundColor: tx.type === 'INCOME' ? 'var(--green-income-bg)' : 'var(--red-expense-bg)',
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'center'
+                      justifyContent: 'center',
+                      flexShrink: 0
                     }}>
                       {getTransactionIcon(tx)}
                     </div>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', wordBreak: 'break-word' }}>
                         {tx.transactionName || tx.name || t('unnamedTransaction')}
                       </div>
-                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                      <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                         Today • {tx.paymentMethod}
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ textAlign: 'right' }}>
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
                     <div style={{
                       fontSize: '15px',
                       fontWeight: '800',

@@ -24,7 +24,6 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       ]),
       Transaction.find({ userId, date: today })
         .sort({ createdAt: -1 })
-        .limit(5)
         .select('id type amount name transactionName category paymentMethod description date createdAt')
         .lean()
     ]);
