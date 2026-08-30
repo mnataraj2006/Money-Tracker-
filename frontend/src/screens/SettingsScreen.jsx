@@ -60,10 +60,11 @@ export default function SettingsScreen({ user, onLogout, onUpdateUser, viewMode 
   const [cloudStatus, setCloudStatus] = useState('');
   const [cloudError, setCloudError] = useState('');
 
-  // Google Drive Connection State
+  // Google Drive Connection State (Synchronized via backend)
   const [isDriveConnected, setIsDriveConnected] = useState(() => googleDriveService.isConnected());
   const [driveAccountEmail, setDriveAccountEmail] = useState(() => googleDriveService.getConnectedAccount() || user?.email || '');
   const [driveConnecting, setDriveConnecting] = useState(false);
+  const [driveStatusLoading, setDriveStatusLoading] = useState(true);
   const [driveNeedsReauth, setDriveNeedsReauth] = useState(false);
 
   // Restore Modal State
@@ -113,11 +114,43 @@ export default function SettingsScreen({ user, onLogout, onUpdateUser, viewMode 
     if (user?.email && !driveAccountEmail) {
       setDriveAccountEmail(user.email);
     }
+    loadDriveStatus();
   }, [user]);
 
-  const handleFrequencyChange = (freq) => {
+  const loadDriveStatus = async () => {
+    try {
+      setDriveStatusLoading(true);
+      const res = await settingsAPI.getDriveStatus();
+      if (res) {
+        setIsDriveConnected(!!res.connected);
+        if (res.googleEmail) {
+          setDriveAccountEmail(res.googleEmail);
+        }
+        if (res.lastBackupAt) {
+          setLastBackup(res.lastBackupAt);
+          setLastBackupTime(res.lastBackupAt);
+        }
+        if (res.backupFrequency) {
+          setCloudFrequencyState(res.backupFrequency);
+          setBackupFrequency(res.backupFrequency);
+        }
+        googleDriveService.syncWithBackendStatus(res);
+      }
+    } catch (err) {
+      console.warn('Failed to load drive status from backend:', err);
+    } finally {
+      setDriveStatusLoading(false);
+    }
+  };
+
+  const handleFrequencyChange = async (freq) => {
     setCloudFrequencyState(freq);
     setBackupFrequency(freq);
+    try {
+      await settingsAPI.updateDriveFrequency(freq);
+    } catch (e) {
+      console.warn('Failed to persist frequency to backend:', e);
+    }
   };
 
   // Direct Gesture-Safe Google Drive Connect
@@ -129,9 +162,14 @@ export default function SettingsScreen({ user, onLogout, onUpdateUser, viewMode 
       const hintEmail = user?.email || driveAccountEmail;
       const token = await googleDriveService.requestFreshToken(true, hintEmail);
       if (token) {
+        const email = googleDriveService.getConnectedAccount() || hintEmail || '';
+        try {
+          await settingsAPI.connectDrive({ email });
+        } catch (backendErr) {
+          console.warn('Failed to record connection at backend:', backendErr);
+        }
         setIsDriveConnected(true);
         setDriveNeedsReauth(false);
-        const email = googleDriveService.getConnectedAccount() || hintEmail || '';
         setDriveAccountEmail(email);
         setCloudStatus(t('driveConnectedSuccess') || '✓ Google Drive connected successfully!');
         setTimeout(() => setCloudStatus(''), 4000);
@@ -145,7 +183,12 @@ export default function SettingsScreen({ user, onLogout, onUpdateUser, viewMode 
     }
   };
 
-  const handleDisconnectDrive = () => {
+  const handleDisconnectDrive = async () => {
+    try {
+      await settingsAPI.disconnectDrive();
+    } catch (e) {
+      console.warn('Backend disconnect error:', e);
+    }
     googleDriveService.disconnect();
     setIsDriveConnected(false);
     setDriveNeedsReauth(false);
@@ -571,8 +614,8 @@ export default function SettingsScreen({ user, onLogout, onUpdateUser, viewMode 
               <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '15px', color: 'var(--navy-primary)', fontWeight: '800' }}>
                 <Cloud size={20} color="#4F46E5" /> {t('googleDriveBackup')}
               </div>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: isDriveConnected ? '#16A34A' : '#64748B' }}>
-                {isDriveConnected ? (t('googleDriveConnected') || 'Connected ✓') : (t('googleDriveNotConnected') || 'Not Connected')}
+              <div style={{ fontSize: '11px', fontWeight: '700', color: driveStatusLoading ? '#64748B' : (isDriveConnected ? '#16A34A' : '#64748B') }}>
+                {driveStatusLoading ? 'Checking connection...' : (isDriveConnected ? (t('googleDriveConnected') || 'Connected ✓') : (t('googleDriveNotConnected') || 'Not Connected'))}
               </div>
             </div>
 

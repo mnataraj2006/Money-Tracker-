@@ -103,5 +103,10 @@ export const settingsAPI = {
   get: () => request('/settings'),
   update: (settingsData) => request('/settings', { method: 'PUT', body: JSON.stringify(settingsData) }),
   exportBackup: () => request('/settings/export'),
-  restoreBackup: (backupData) => request('/settings/restore', { method: 'POST', body: JSON.stringify({ backupData }) })
+  restoreBackup: (backupData) => request('/settings/restore', { method: 'POST', body: JSON.stringify({ backupData }) }),
+  getDriveStatus: () => request('/settings/drive-status'),
+  connectDrive: (driveData) => request('/settings/drive-connect', { method: 'POST', body: JSON.stringify(driveData) }),
+  recordDriveBackup: (statusData) => request('/settings/drive-record-backup', { method: 'POST', body: JSON.stringify(statusData) }),
+  disconnectDrive: () => request('/settings/drive-disconnect', { method: 'POST' }),
+  updateDriveFrequency: (frequency) => request('/settings/drive-frequency', { method: 'PUT', body: JSON.stringify({ frequency }) })
 };

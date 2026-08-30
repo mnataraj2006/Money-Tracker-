@@ -40,6 +40,15 @@ const userSchema = new mongoose.Schema({
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   profileImage: { type: String, default: '' },
   passwordHash: { type: String, default: '' },
+  googleDrive: {
+    connected: { type: Boolean, default: false },
+    googleEmail: { type: String, default: null },
+    googleUserId: { type: String, default: null },
+    connectedAt: { type: Date, default: null },
+    lastBackupAt: { type: Date, default: null },
+    lastBackupStatus: { type: String, enum: ['SUCCESS', 'FAILED', 'PENDING', null], default: null },
+    backupFrequency: { type: String, enum: ['daily', 'weekly', 'manual', 'disabled'], default: 'weekly' }
+  },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
 });

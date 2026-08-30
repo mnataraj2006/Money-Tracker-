@@ -36,9 +36,17 @@ export async function performCloudBackup(explicitToken = null) {
     const result = await googleDriveService.uploadBackup(backupData, token);
     const nowIso = new Date().toISOString();
     setLastBackupTime(nowIso);
+    try {
+      await settingsAPI.recordDriveBackup({ status: 'SUCCESS' });
+    } catch (recordErr) {
+      console.warn('Failed to sync backup timestamp to backend:', recordErr);
+    }
     return { success: true, timestamp: nowIso, result };
   } catch (err) {
     console.error('Cloud backup error:', err);
+    try {
+      await settingsAPI.recordDriveBackup({ status: 'FAILED' });
+    } catch (e) {}
     throw err;
   }
 }

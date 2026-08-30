@@ -75,6 +75,23 @@ class GoogleDriveService {
   }
 
   /**
+   * Sync in-memory state with backend account-level status
+   */
+  syncWithBackendStatus(status) {
+    if (status?.connected) {
+      if (status.googleEmail) {
+        this.connectedEmail = status.googleEmail;
+        localStorage.setItem(STORAGE_KEY_EMAIL, status.googleEmail);
+      }
+    } else if (status && status.connected === false) {
+      this.connectedEmail = null;
+      try {
+        localStorage.removeItem(STORAGE_KEY_EMAIL);
+      } catch (e) {}
+    }
+  }
+
+  /**
    * Disconnect Google Drive and clear local tokens
    */
   disconnect() {

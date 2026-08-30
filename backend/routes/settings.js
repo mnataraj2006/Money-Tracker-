@@ -182,4 +182,148 @@ router.post('/restore', authenticateToken, async (req, res) => {
   }
 });
 
+// GOOGLE DRIVE CLOUD BACKUP ACCOUNT-LEVEL STATE ENDPOINTS
+
+// 1. GET GOOGLE DRIVE CONNECTION STATUS FOR CURRENT USER
+router.get('/drive-status', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { User } = require('../db_mongo');
+
+  try {
+    const user = await User.findOne({ id: userId }).select('googleDrive email fullName').lean();
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const drive = user.googleDrive || {};
+    return res.json({
+      connected: !!drive.connected,
+      googleEmail: drive.googleEmail || null,
+      googleUserId: drive.googleUserId || null,
+      connectedAt: drive.connectedAt || null,
+      lastBackupAt: drive.lastBackupAt || null,
+      lastBackupStatus: drive.lastBackupStatus || null,
+      backupFrequency: drive.backupFrequency || 'weekly'
+    });
+  } catch (err) {
+    console.error('Error fetching drive status:', err);
+    return res.status(500).json({ error: 'Failed to fetch Google Drive status' });
+  }
+});
+
+// 2. CONNECT GOOGLE DRIVE AT USER LEVEL
+router.post('/drive-connect', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { email, googleUserId } = req.body;
+  const { User } = require('../db_mongo');
+
+  try {
+    const updated = await User.findOneAndUpdate(
+      { id: userId },
+      {
+        $set: {
+          'googleDrive.connected': true,
+          'googleDrive.googleEmail': email || req.user.email,
+          'googleDrive.googleUserId': googleUserId || null,
+          'googleDrive.connectedAt': new Date(),
+          updatedAt: new Date()
+        }
+      },
+      { new: true }
+    ).lean();
+
+    return res.json({
+      message: 'Google Drive connected successfully at account level',
+      drive: updated.googleDrive
+    });
+  } catch (err) {
+    console.error('Error connecting drive:', err);
+    return res.status(500).json({ error: 'Failed to connect Google Drive' });
+  }
+});
+
+// 3. RECORD SUCCESSFUL BACKUP AT USER LEVEL
+router.post('/drive-record-backup', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { status = 'SUCCESS' } = req.body;
+  const { User } = require('../db_mongo');
+
+  try {
+    const now = new Date();
+    await User.findOneAndUpdate(
+      { id: userId },
+      {
+        $set: {
+          'googleDrive.lastBackupAt': now,
+          'googleDrive.lastBackupStatus': status,
+          updatedAt: now
+        }
+      }
+    );
+
+    return res.json({
+      message: 'Backup recorded',
+      lastBackupAt: now.toISOString(),
+      lastBackupStatus: status
+    });
+  } catch (err) {
+    console.error('Error recording backup:', err);
+    return res.status(500).json({ error: 'Failed to record backup status' });
+  }
+});
+
+// 4. DISCONNECT GOOGLE DRIVE AT USER LEVEL
+router.post('/drive-disconnect', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { User } = require('../db_mongo');
+
+  try {
+    await User.findOneAndUpdate(
+      { id: userId },
+      {
+        $set: {
+          'googleDrive.connected': false,
+          'googleDrive.googleEmail': null,
+          'googleDrive.googleUserId': null,
+          'googleDrive.connectedAt': null,
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    return res.json({ message: 'Google Drive disconnected from account' });
+  } catch (err) {
+    console.error('Error disconnecting drive:', err);
+    return res.status(500).json({ error: 'Failed to disconnect Google Drive' });
+  }
+});
+
+// 5. UPDATE BACKUP FREQUENCY AT USER LEVEL
+router.put('/drive-frequency', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { frequency } = req.body;
+  const { User } = require('../db_mongo');
+
+  if (!['daily', 'weekly', 'manual', 'disabled'].includes(frequency)) {
+    return res.status(400).json({ error: 'Invalid frequency value' });
+  }
+
+  try {
+    await User.findOneAndUpdate(
+      { id: userId },
+      {
+        $set: {
+          'googleDrive.backupFrequency': frequency,
+          updatedAt: new Date()
+        }
+      }
+    );
+
+    return res.json({ message: 'Backup frequency updated', frequency });
+  } catch (err) {
+    console.error('Error updating drive frequency:', err);
+    return res.status(500).json({ error: 'Failed to update backup frequency' });
+  }
+});
+
 module.exports = router;
