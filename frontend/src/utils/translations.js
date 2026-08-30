@@ -285,10 +285,16 @@ export const translations = {
     // Reports
     reports: 'Reports',
     generatePdf: 'Generate PDF',
+    generateRangePdf: 'Generate Date Range PDF',
     singleDay: 'Single Day',
     dateRange: 'Date Range',
     dailyFinancialReport: 'Daily Financial Report',
-    downloadPdf: 'Download PDF'
+    rangeFinancialReport: 'Date Range Financial Statement',
+    downloadPdf: 'Download PDF',
+    fromDate: 'From Date',
+    toDate: 'To Date',
+    periodSummary: 'Period Summary',
+    dayWiseBreakdown: 'Day-wise Breakdown'
   },
   ta: {
     // Navigation
@@ -574,9 +580,15 @@ export const translations = {
     // Reports
     reports: 'அறிக்கைகள்',
     generatePdf: 'PDF அறிக்கையை உருவாக்கவும்',
+    generateRangePdf: 'தேதி வரம்பு PDF அறிக்கை',
     singleDay: 'ஒற்றை நாள்',
     dateRange: 'தேதி வரம்பு',
     dailyFinancialReport: 'தினசரி நிதி அறிக்கை',
-    downloadPdf: 'PDF பதிவிறக்கம்'
+    rangeFinancialReport: 'தேதி வரம்பு நிதி அறிக்கை',
+    downloadPdf: 'PDF பதிவிறக்கம்',
+    fromDate: 'தொடக்க தேதி',
+    toDate: 'முடிவு தேதி',
+    periodSummary: 'கால சுருக்கம்',
+    dayWiseBreakdown: 'நாள் வாரியான விவரம்'
   }
 };

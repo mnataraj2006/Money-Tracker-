@@ -9,13 +9,14 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  Sparkles,
   Landmark,
-  Wallet
+  Wallet,
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 import { summaryAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
-import { generateDailyFinancialReport } from '../utils/pdfGenerator';
+import { generateDailyFinancialReport, generateDateRangeFinancialReport } from '../utils/pdfGenerator';
 import PageContainer from '../components/PageContainer';
 
 export default function ReportsScreen({ onBack, onNavigate, user }) {
@@ -27,13 +28,17 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
   // Date Range state
   const [fromDate, setFromDate] = useState(() => {
     const d = new Date();
-    d.setDate(1);
-    return d.toISOString().split('T')[0];
+    d.setDate(1); // 1st of current month
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   });
   const [toDate, setToDate] = useState(() => new Date().toISOString().split('T')[0]);
 
   const [loading, setLoading] = useState(false);
   const [summaryData, setSummaryData] = useState(null);
+  const [rangeData, setRangeData] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [successMsg, setSuccessMsg] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -41,8 +46,10 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
   useEffect(() => {
     if (mode === 'SINGLE_DAY') {
       loadDaySummary();
+    } else if (mode === 'DATE_RANGE') {
+      loadRangeSummary();
     }
-  }, [selectedDate, mode]);
+  }, [selectedDate, fromDate, toDate, mode]);
 
   const loadDaySummary = async () => {
     try {
@@ -53,6 +60,25 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
     } catch (err) {
       console.error('Failed to load day details for report:', err);
       setErrorMsg('Failed to load financial details for the selected date.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadRangeSummary = async () => {
+    if (!fromDate || !toDate) return;
+    if (fromDate > toDate) {
+      setErrorMsg('From Date cannot be after To Date');
+      return;
+    }
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+      const res = await summaryAPI.getRangeReport(fromDate, toDate);
+      setRangeData(res);
+    } catch (err) {
+      console.error('Failed to load range report data:', err);
+      setErrorMsg('Failed to load date range financial data.');
     } finally {
       setLoading(false);
     }
@@ -96,7 +122,7 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
     }
   };
 
-  const handleGeneratePDF = async () => {
+  const handleGenerateSingleDayPDF = async () => {
     if (!summaryData) return;
     try {
       setGenerating(true);
@@ -120,9 +146,33 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
     }
   };
 
+  const handleGenerateRangePDF = async () => {
+    if (!rangeData) return;
+    try {
+      setGenerating(true);
+      setSuccessMsg(null);
+      setErrorMsg(null);
+
+      const filename = await generateDateRangeFinancialReport({
+        fromDate,
+        toDate,
+        rangeData,
+        user,
+        language
+      });
+
+      setSuccessMsg(`Date Range PDF Generated: ${filename}`);
+      setTimeout(() => setSuccessMsg(null), 4000);
+    } catch (err) {
+      console.error('Range PDF Generation failed:', err);
+      setErrorMsg('Failed to generate Date Range PDF. Please try again.');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
   const incomeCount = summaryData?.transactions?.filter(t => t.type === 'INCOME').length || 0;
   const expenseCount = summaryData?.transactions?.filter(t => t.type === 'EXPENSE').length || 0;
-  const withdrawalCount = summaryData?.transactions?.filter(t => t.type === 'CASH_WITHDRAWAL').length || 0;
   const totalTxCount = summaryData?.transactions?.length || 0;
 
   return (
@@ -185,7 +235,7 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
               transition: 'all 0.2s ease'
             }}
           >
-            <Calendar size={15} /> Single Day
+            <Calendar size={15} /> {t('singleDay') || 'Single Day'}
           </button>
 
           <button
@@ -206,7 +256,7 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
               transition: 'all 0.2s ease'
             }}
           >
-            <Clock size={15} /> Date Range
+            <Clock size={15} /> {t('dateRange') || 'Date Range'}
           </button>
         </div>
 
@@ -378,7 +428,7 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
             {/* Generate Button */}
             <button
               className="btn-primary-navy"
-              onClick={handleGeneratePDF}
+              onClick={handleGenerateSingleDayPDF}
               disabled={loading || generating || !summaryData}
               style={{
                 padding: '16px',
@@ -401,16 +451,17 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
               ) : (
                 <>
                   <Download size={20} />
-                  <span>Generate Single-Page PDF</span>
+                  <span>{t('generatePdf') || 'Generate Single-Page PDF'}</span>
                 </>
               )}
             </button>
           </div>
         )}
 
-        {/* 5. DATE RANGE MODE (PREPARED ARCHITECTURE) */}
+        {/* 5. DATE RANGE MODE */}
         {mode === 'DATE_RANGE' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            {/* Date Range Selector Card */}
             <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary, #64748B)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
                 Select Date Range
@@ -419,7 +470,7 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary, #64748B)', display: 'block', marginBottom: '4px' }}>
-                    From Date
+                    {t('fromDate') || 'From Date'}
                   </label>
                   <input
                     type="date"
@@ -438,7 +489,7 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
 
                 <div>
                   <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary, #64748B)', display: 'block', marginBottom: '4px' }}>
-                    To Date
+                    {t('toDate') || 'To Date'}
                   </label>
                   <input
                     type="date"
@@ -457,35 +508,113 @@ export default function ReportsScreen({ onBack, onNavigate, user }) {
               </div>
             </div>
 
-            {/* Coming Soon Notice Card */}
-            <div style={{
-              backgroundColor: '#EEF2FF',
-              border: '1px solid #C7D2FE',
-              borderRadius: '12px',
-              padding: '20px',
-              textAlign: 'center',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '10px'
-            }}>
-              <Sparkles size={28} color="#4338CA" />
-              <div>
-                <div style={{ fontSize: '15px', fontWeight: '800', color: '#312E81' }}>
-                  Multi-Day Date Range Reports Coming Soon
+            {/* Range Contents Preview */}
+            <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary, #64748B)', letterSpacing: '0.8px', textTransform: 'uppercase' }}>
+                  {t('periodSummary') || 'Period Summary Preview'}
                 </div>
-                <div style={{ fontSize: '12px', color: '#4338CA', marginTop: '4px', maxWidth: '300px' }}>
-                  Comprehensive multi-day statements and monthly trend PDFs will be available in the next release.
-                </div>
+                <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--navy-primary, #1E293B)' }}>
+                  {rangeData?.daysCount || 0} Days • {rangeData?.transactions?.length || 0} Transactions
+                </span>
               </div>
+
+              {loading ? (
+                <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-secondary, #64748B)', fontSize: '13px' }}>
+                  Loading date range summary...
+                </div>
+              ) : rangeData ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', textAlign: 'center' }}>
+                    <div style={{ background: '#F0FDF4', padding: '10px', borderRadius: '8px', border: '1px solid #DCFCE7' }}>
+                      <div style={{ fontSize: '11px', color: '#16A34A', fontWeight: '700' }}>Income</div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#16A34A', marginTop: '2px' }}>
+                        +{formatCurrency(rangeData.totalIncome)}
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#FEF2F2', padding: '10px', borderRadius: '8px', border: '1px solid #FEE2E2' }}>
+                      <div style={{ fontSize: '11px', color: '#DC2626', fontWeight: '700' }}>Expense</div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: '#DC2626', marginTop: '2px' }}>
+                        -{formatCurrency(rangeData.totalExpense)}
+                      </div>
+                    </div>
+
+                    <div style={{ background: '#F8FAFC', padding: '10px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                      <div style={{ fontSize: '11px', color: '#1E293B', fontWeight: '700' }}>Net Savings</div>
+                      <div style={{ fontSize: '15px', fontWeight: '800', color: rangeData.netSavings >= 0 ? '#15803D' : '#DC2626', marginTop: '2px' }}>
+                        {rangeData.netSavings >= 0 ? '+' : '-'}{formatCurrency(rangeData.netSavings)}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Day-Wise Breakdown Accordion / List */}
+                  {rangeData.dailyBreakdown?.length > 0 && (
+                    <div style={{ marginTop: '4px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '800', color: 'var(--text-secondary, #64748B)', marginBottom: '6px', textTransform: 'uppercase' }}>
+                        {t('dayWiseBreakdown') || 'Day-wise Breakdown'}
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '160px', overflowY: 'auto' }}>
+                        {rangeData.dailyBreakdown.map((day) => (
+                          <div
+                            key={day.date}
+                            style={{
+                              display: 'flex',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              padding: '8px 10px',
+                              borderRadius: '6px',
+                              background: 'var(--bg-app, #F8FAFC)',
+                              border: '1px solid var(--border-color, #E2E8F0)',
+                              fontSize: '12px'
+                            }}
+                          >
+                            <span style={{ fontWeight: '700', color: '#1E293B' }}>{formatLongDate(day.date)}</span>
+                            <div style={{ display: 'flex', gap: '10px', fontWeight: '700' }}>
+                              <span style={{ color: '#16A34A' }}>+{formatCurrency(day.income)}</span>
+                              <span style={{ color: '#DC2626' }}>-{formatCurrency(day.expense)}</span>
+                              <span style={{ color: day.net >= 0 ? '#15803D' : '#DC2626' }}>
+                                ({day.net >= 0 ? '+' : '-'}{formatCurrency(day.net)})
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
             </div>
 
+            {/* Generate Range PDF Button */}
             <button
-              className="btn-outline-navy"
-              onClick={() => setMode('SINGLE_DAY')}
-              style={{ padding: '14px', fontSize: '14px', fontWeight: '700' }}
+              className="btn-primary-navy"
+              onClick={handleGenerateRangePDF}
+              disabled={loading || generating || !rangeData}
+              style={{
+                padding: '16px',
+                fontSize: '16px',
+                fontWeight: '800',
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '10px',
+                boxShadow: '0 4px 12px rgba(30, 41, 59, 0.15)',
+                cursor: (loading || generating) ? 'not-allowed' : 'pointer'
+              }}
             >
-              Switch to Single Day PDF
+              {generating ? (
+                <>
+                  <div className="spinner" style={{ width: '18px', height: '18px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%' }} />
+                  Generating Date Range PDF...
+                </>
+              ) : (
+                <>
+                  <Download size={20} />
+                  <span>{t('generateRangePdf') || 'Generate Date Range PDF'}</span>
+                </>
+              )}
             </button>
           </div>
         )}

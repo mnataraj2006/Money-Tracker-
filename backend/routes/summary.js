@@ -383,4 +383,148 @@ router.get('/monthly-summary', authenticateToken, async (req, res) => {
   }
 });
 
+// 5. DATE RANGE MULTI-DAY SUMMARY & DETAILED REPORT ENDPOINT
+router.get('/range-report', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const fromDate = req.query.from || req.query.fromDate;
+  const toDate = req.query.to || req.query.toDate || fromDate;
+
+  if (!fromDate) {
+    return res.status(400).json({ error: 'from date query parameter is required (YYYY-MM-DD)' });
+  }
+
+  try {
+    const [rangeTxs, closingRows, countRows, bankAccounts] = await Promise.all([
+      Transaction.find({
+        userId,
+        date: { $gte: fromDate, $lte: toDate }
+      })
+        .sort({ date: 1, createdAt: 1 })
+        .select('id type amount name transactionName category paymentMethod accountId description date createdAt')
+        .lean(),
+      DailyClosing.find({
+        userId,
+        date: { $gte: fromDate, $lte: toDate }
+      }).lean(),
+      CashCount.find({
+        userId,
+        date: { $gte: fromDate, $lte: toDate }
+      }).sort({ createdAt: -1 }).lean(),
+      BankAccountService.getAllAccountsSummary(userId)
+    ]);
+
+    const bankMap = {};
+    (bankAccounts || []).forEach(b => { bankMap[b.id] = b.name; });
+
+    // Enrich transactions with resolved transactionName and accountName
+    const enrichedTxs = rangeTxs.map(tx => ({
+      ...tx,
+      transactionName: (tx.transactionName && tx.transactionName.trim())
+        ? tx.transactionName.trim()
+        : ((tx.name && tx.name.trim()) ? tx.name.trim() : (tx.type === 'CASH_WITHDRAWAL' ? 'Cash Withdrawal' : 'Unnamed Transaction')),
+      accountName: tx.accountId && tx.accountId !== 'CASH' ? (bankMap[tx.accountId] || 'Bank') : (tx.paymentMethod === 'CASH' ? 'Cash' : '')
+    }));
+
+    // Period Totals
+    let totalIncome = 0;
+    let totalExpense = 0;
+    let cashIncome = 0;
+    let cashExpense = 0;
+    let cashWithdrawal = 0;
+    let upiIncome = 0;
+    let upiExpense = 0;
+
+    enrichedTxs.forEach(t => {
+      const amt = parseFloat(t.amount) || 0;
+      if (t.type === 'INCOME') {
+        totalIncome += amt;
+        if (t.paymentMethod === 'CASH') cashIncome += amt;
+        else upiIncome += amt;
+      } else if (t.type === 'EXPENSE') {
+        totalExpense += amt;
+        if (t.paymentMethod === 'CASH') cashExpense += amt;
+        else upiExpense += amt;
+      } else if (t.type === 'CASH_WITHDRAWAL') {
+        cashWithdrawal += amt;
+      }
+    });
+
+    const netSavings = totalIncome - totalExpense;
+    const netCashChange = cashIncome - cashExpense + cashWithdrawal;
+    const netUpiChange = upiIncome - upiExpense - cashWithdrawal;
+
+    // Group by Date
+    const daysMap = {};
+    enrichedTxs.forEach(t => {
+      if (!daysMap[t.date]) {
+        daysMap[t.date] = {
+          date: t.date,
+          income: 0,
+          expense: 0,
+          cashIncome: 0,
+          cashExpense: 0,
+          cashWithdrawal: 0,
+          net: 0,
+          transactions: []
+        };
+      }
+      const day = daysMap[t.date];
+      const amt = parseFloat(t.amount) || 0;
+      day.transactions.push(t);
+      if (t.type === 'INCOME') {
+        day.income += amt;
+        if (t.paymentMethod === 'CASH') day.cashIncome += amt;
+      } else if (t.type === 'EXPENSE') {
+        day.expense += amt;
+        if (t.paymentMethod === 'CASH') day.cashExpense += amt;
+      } else if (t.type === 'CASH_WITHDRAWAL') {
+        day.cashWithdrawal += amt;
+      }
+      day.net = day.income - day.expense;
+    });
+
+    // Map Closings / Counts
+    const closingMap = {};
+    closingRows.forEach(c => { closingMap[c.date] = c; });
+    const countMap = {};
+    countRows.forEach(c => { if (!countMap[c.date]) countMap[c.date] = c; });
+
+    const dailyBreakdown = Object.keys(daysMap)
+      .sort((a, b) => a.localeCompare(b))
+      .map(dateStr => {
+        const d = daysMap[dateStr];
+        const closing = closingMap[dateStr];
+        const count = countMap[dateStr];
+        return {
+          ...d,
+          isClosed: !!closing?.isClosed,
+          physicalCash: count ? count.physicalCash : (closing ? closing.physicalCash : null),
+          status: closing ? closing.status : (count ? 'COUNTED' : 'UNCHECKED')
+        };
+      });
+
+    return res.json({
+      fromDate,
+      toDate,
+      daysCount: dailyBreakdown.length,
+      totalIncome,
+      totalExpense,
+      netSavings,
+      cashIncome,
+      cashExpense,
+      cashWithdrawal,
+      netCashChange,
+      upiIncome,
+      upiExpense,
+      netUpiChange,
+      bankAccounts: bankAccounts || [],
+      dailyBreakdown,
+      transactions: enrichedTxs
+    });
+  } catch (err) {
+    console.error('Error generating range report:', err);
+    return res.status(500).json({ error: 'Failed to generate date range report' });
+  }
+});
+
 module.exports = router;
