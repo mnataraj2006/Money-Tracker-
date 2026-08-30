@@ -53,19 +53,22 @@ class CashCalculationService {
 
   /**
    * Compute Expected Cash for a given target date
-   * Formula: Previous Closing + CASH Income - CASH Expense
+   * Formula: Previous Closing + CASH Income - CASH Expense + CASH Withdrawals
    */
   static async getExpectedCash(userId, targetDate) {
     try {
       const previousDayCash = await this.getPreviousClosingCash(userId, targetDate);
 
-      // Fast MongoDB aggregation for today's cash income & expense
+      // Fast MongoDB aggregation for today's cash income, cash expense, and cash withdrawals
       const agg = await Transaction.aggregate([
         {
           $match: {
             userId,
             date: targetDate,
-            paymentMethod: 'CASH'
+            $or: [
+              { paymentMethod: 'CASH', type: { $in: ['INCOME', 'EXPENSE'] } },
+              { type: 'CASH_WITHDRAWAL' }
+            ]
           }
         },
         {
@@ -78,13 +81,15 @@ class CashCalculationService {
 
       let todayCashIncome = 0;
       let todayCashExpense = 0;
+      let todayCashWithdrawal = 0;
 
       agg.forEach(item => {
         if (item._id === 'INCOME') todayCashIncome = item.total;
         if (item._id === 'EXPENSE') todayCashExpense = item.total;
+        if (item._id === 'CASH_WITHDRAWAL') todayCashWithdrawal = item.total;
       });
 
-      const expectedCash = previousDayCash + todayCashIncome - todayCashExpense;
+      const expectedCash = previousDayCash + todayCashIncome - todayCashExpense + todayCashWithdrawal;
 
       const [countRow, closingRow] = await Promise.all([
         CashCount.findOne({ userId, date: targetDate }).sort({ createdAt: -1 }).lean(),
@@ -115,6 +120,7 @@ class CashCalculationService {
         previousDayCash,
         todayCashIncome,
         todayCashExpense,
+        todayCashWithdrawal,
         expectedCash,
         physicalCash,
         difference,
@@ -148,7 +154,10 @@ class CashCalculationService {
             $match: {
               userId,
               date: closing.date,
-              paymentMethod: 'CASH'
+              $or: [
+                { paymentMethod: 'CASH', type: { $in: ['INCOME', 'EXPENSE'] } },
+                { type: 'CASH_WITHDRAWAL' }
+              ]
             }
           },
           {
@@ -161,12 +170,14 @@ class CashCalculationService {
 
         let cashIncome = 0;
         let cashExpense = 0;
+        let cashWithdrawal = 0;
         agg.forEach(item => {
           if (item._id === 'INCOME') cashIncome = item.total;
           if (item._id === 'EXPENSE') cashExpense = item.total;
+          if (item._id === 'CASH_WITHDRAWAL') cashWithdrawal = item.total;
         });
 
-        const expectedClosingCash = openingCash + cashIncome - cashExpense;
+        const expectedClosingCash = openingCash + cashIncome - cashExpense + cashWithdrawal;
         const countRow = await CashCount.findOne({ userId, date: closing.date }).sort({ createdAt: -1 }).lean();
 
         let physicalCash;
@@ -187,6 +198,7 @@ class CashCalculationService {
         closing.openingCash = openingCash;
         closing.cashIncome = cashIncome;
         closing.cashExpense = cashExpense;
+        closing.cashWithdrawal = cashWithdrawal;
         closing.expectedClosingCash = expectedClosingCash;
         closing.physicalCash = physicalCash;
         closing.difference = difference;

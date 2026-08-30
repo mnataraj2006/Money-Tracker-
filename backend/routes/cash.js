@@ -3,43 +3,11 @@ const router = express.Router();
 const crypto = require('crypto');
 const { Transaction, CashCount, DailyClosing } = require('../db_mongo');
 const { authenticateToken } = require('../middleware/auth');
+const CashCalculationService = require('../services/cashCalculationService');
 
 // Helper to get previous day closing cash
 async function getPreviousClosingCash(userId, targetDate) {
-  try {
-    const [prevClosing, latestCount] = await Promise.all([
-      DailyClosing.findOne({
-        userId,
-        date: { $lt: targetDate },
-        isClosed: true
-      }).sort({ date: -1 }).select('date physicalCash expectedClosingCash').lean(),
-      CashCount.findOne({
-        userId,
-        date: { $lt: targetDate }
-      }).sort({ date: -1, createdAt: -1 }).select('date physicalCash').lean()
-    ]);
-
-    if (prevClosing && latestCount) {
-      if (latestCount.date > prevClosing.date) {
-        return latestCount.physicalCash;
-      }
-      return prevClosing.physicalCash !== undefined && prevClosing.physicalCash !== null
-        ? prevClosing.physicalCash
-        : prevClosing.expectedClosingCash;
-    }
-
-    if (prevClosing) {
-      return prevClosing.physicalCash !== undefined && prevClosing.physicalCash !== null
-        ? prevClosing.physicalCash
-        : prevClosing.expectedClosingCash;
-    }
-
-    if (latestCount) return latestCount.physicalCash;
-
-    return 0;
-  } catch (err) {
-    return 0;
-  }
+  return await CashCalculationService.getPreviousClosingCash(userId, targetDate);
 }
 
 // Auto-close past unclosed days at midnight
@@ -62,14 +30,26 @@ async function autoClosePastDays(userId) {
       let closing = await DailyClosing.findOne({ userId, date: d });
       if (!closing) {
         const openingCash = await getPreviousClosingCash(userId, d);
-        const cashTxs = await Transaction.find({ userId, date: d, paymentMethod: 'CASH' });
+        const cashTxs = await Transaction.find({
+          userId,
+          date: d,
+          $or: [
+            { paymentMethod: 'CASH', type: { $in: ['INCOME', 'EXPENSE'] } },
+            { type: 'CASH_WITHDRAWAL' }
+          ]
+        });
+
         let cashIncome = 0;
         let cashExpense = 0;
+        let cashWithdrawal = 0;
+
         cashTxs.forEach(t => {
           if (t.type === 'INCOME') cashIncome += t.amount;
           if (t.type === 'EXPENSE') cashExpense += t.amount;
+          if (t.type === 'CASH_WITHDRAWAL') cashWithdrawal += t.amount;
         });
-        const expectedClosingCash = openingCash + cashIncome - cashExpense;
+
+        const expectedClosingCash = openingCash + cashIncome - cashExpense + cashWithdrawal;
         const countRow = await CashCount.findOne({ userId, date: d }).sort({ createdAt: -1 });
         const physicalCash = countRow ? countRow.physicalCash : expectedClosingCash;
         const difference = physicalCash - expectedClosingCash;
@@ -83,6 +63,7 @@ async function autoClosePastDays(userId) {
           openingCash,
           cashIncome,
           cashExpense,
+          cashWithdrawal,
           expectedClosingCash,
           physicalCash,
           difference,
@@ -96,8 +77,6 @@ async function autoClosePastDays(userId) {
     console.error('Error auto-closing past days:', err);
   }
 }
-
-const CashCalculationService = require('../services/cashCalculationService');
 
 // GET EXPECTED CASH AND TODAY'S CASH SUMMARY — OPTIMIZED FAST READ
 router.get('/expected', authenticateToken, async (req, res) => {
@@ -114,59 +93,7 @@ router.get('/expected', authenticateToken, async (req, res) => {
 });
 
 async function recalculateDailyClosingsFrom(userId, startDate) {
-  try {
-    autoClosePastDays(userId).catch(err => console.error('Background autoClosePastDays error:', err));
-
-    const affectedClosings = await DailyClosing.find({
-      userId,
-      date: { $gte: startDate }
-    }).sort({ date: 1 });
-
-    for (let closing of affectedClosings) {
-      const openingCash = await getPreviousClosingCash(userId, closing.date);
-      const cashTxs = await Transaction.find({
-        userId,
-        date: closing.date,
-        paymentMethod: 'CASH'
-      });
-
-      let cashIncome = 0;
-      let cashExpense = 0;
-      cashTxs.forEach(t => {
-        if (t.type === 'INCOME') cashIncome += t.amount;
-        if (t.type === 'EXPENSE') cashExpense += t.amount;
-      });
-
-      const expectedClosingCash = openingCash + cashIncome - cashExpense;
-      const countRow = await CashCount.findOne({ userId, date: closing.date }).sort({ createdAt: -1 });
-
-      let physicalCash;
-      if (countRow) {
-        physicalCash = countRow.physicalCash;
-      } else if (closing.isClosed && closing.physicalCash !== undefined && closing.physicalCash !== null) {
-        physicalCash = closing.physicalCash;
-      } else {
-        physicalCash = expectedClosingCash;
-      }
-
-      const difference = physicalCash - expectedClosingCash;
-
-      let status = 'TALLIED';
-      if (difference < 0) status = 'SHORT';
-      if (difference > 0) status = 'EXTRA';
-
-      closing.openingCash = openingCash;
-      closing.cashIncome = cashIncome;
-      closing.cashExpense = cashExpense;
-      closing.expectedClosingCash = expectedClosingCash;
-      closing.physicalCash = physicalCash;
-      closing.difference = difference;
-      closing.status = status;
-      await closing.save();
-    }
-  } catch (err) {
-    console.error('Error recalculating daily closings:', err);
-  }
+  await CashCalculationService.recalculateDailyClosingsFrom(userId, startDate);
 }
 
 // SAVE DENOMINATION COUNT
@@ -189,17 +116,8 @@ router.post('/count', authenticateToken, async (req, res) => {
   const physicalCash = (q500 * 500) + (q200 * 200) + (q100 * 100) + (q50 * 50) + (q20 * 20) + (q10 * 10) + (q5 * 5) + (q2 * 2) + (q1 * 1);
 
   try {
-    const previousDayCash = await getPreviousClosingCash(userId, targetDate);
-
-    const cashTxs = await Transaction.find({ userId, date: targetDate, paymentMethod: 'CASH' });
-    let todayCashIncome = 0;
-    let todayCashExpense = 0;
-    cashTxs.forEach(t => {
-      if (t.type === 'INCOME') todayCashIncome += t.amount;
-      if (t.type === 'EXPENSE') todayCashExpense += t.amount;
-    });
-
-    const expectedCash = previousDayCash + todayCashIncome - todayCashExpense;
+    const cashData = await CashCalculationService.getExpectedCash(userId, targetDate);
+    const expectedCash = cashData.expectedCash;
     const difference = physicalCash - expectedCash;
     let status = 'TALLIED';
     if (difference < 0) status = 'SHORT';
@@ -249,17 +167,12 @@ router.post('/close-day', authenticateToken, async (req, res) => {
   const targetDate = req.body.date || new Date().toISOString().split('T')[0];
 
   try {
-    const openingCash = await getPreviousClosingCash(userId, targetDate);
-
-    const cashTxs = await Transaction.find({ userId, date: targetDate, paymentMethod: 'CASH' });
-    let cashIncome = 0;
-    let cashExpense = 0;
-    cashTxs.forEach(t => {
-      if (t.type === 'INCOME') cashIncome += t.amount;
-      if (t.type === 'EXPENSE') cashExpense += t.amount;
-    });
-
-    const expectedClosingCash = openingCash + cashIncome - cashExpense;
+    const cashData = await CashCalculationService.getExpectedCash(userId, targetDate);
+    const openingCash = cashData.previousDayCash;
+    const cashIncome = cashData.todayCashIncome;
+    const cashExpense = cashData.todayCashExpense;
+    const cashWithdrawal = cashData.todayCashWithdrawal || 0;
+    const expectedClosingCash = cashData.expectedCash;
 
     const countRow = await CashCount.findOne({ userId, date: targetDate }).sort({ createdAt: -1 });
     const physicalCash = countRow ? countRow.physicalCash : expectedClosingCash;
@@ -279,6 +192,7 @@ router.post('/close-day', authenticateToken, async (req, res) => {
         openingCash,
         cashIncome,
         cashExpense,
+        cashWithdrawal,
         expectedClosingCash,
         physicalCash,
         difference,
@@ -298,6 +212,7 @@ router.post('/close-day', authenticateToken, async (req, res) => {
         openingCash,
         cashIncome,
         cashExpense,
+        cashWithdrawal,
         expectedClosingCash,
         physicalCash,
         difference,

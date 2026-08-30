@@ -11,7 +11,7 @@ export async function initGoogleAuth() {
     try {
       await GoogleAuth.initialize({
         clientId: CLIENT_ID,
-        scopes: ['profile', 'email'],
+        scopes: ['profile', 'email', 'https://www.googleapis.com/auth/drive.appdata'],
         grantOfflineAccess: false,
       });
       isPluginInitialized = true;

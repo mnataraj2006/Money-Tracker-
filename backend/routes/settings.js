@@ -53,21 +53,23 @@ router.put('/', authenticateToken, async (req, res) => {
 // EXPORT COMPLETE USER DATA BACKUP
 router.get('/export', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-  const { Transaction, CashCount, DailyClosing, Settings } = require('../db_mongo');
+  const { Transaction, BankAccount, CashCount, DailyClosing, Settings } = require('../db_mongo');
 
   try {
-    const transactions = await Transaction.find({ userId });
-    const cashCounts = await CashCount.find({ userId });
-    const dailyClosings = await DailyClosing.find({ userId });
-    const settings = await Settings.findOne({ userId });
+    const transactions = await Transaction.find({ userId }).lean();
+    const bankAccounts = await BankAccount.find({ userId }).lean();
+    const cashCounts = await CashCount.find({ userId }).lean();
+    const dailyClosings = await DailyClosing.find({ userId }).lean();
+    const settings = await Settings.findOne({ userId }).lean();
 
     return res.json({
-      appName: 'Money Tracker',
-      version: '1.0',
+      appName: 'Cashly',
+      version: '2.0',
       exportDate: new Date().toISOString(),
       userId,
       data: {
         transactions,
+        bankAccounts,
         cashCounts,
         dailyClosings,
         settings
@@ -82,7 +84,7 @@ router.get('/export', authenticateToken, async (req, res) => {
 // RESTORE USER DATA FROM BACKUP
 router.post('/restore', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-  const { Transaction, CashCount, DailyClosing, Settings } = require('../db_mongo');
+  const { Transaction, BankAccount, CashCount, DailyClosing, Settings } = require('../db_mongo');
   const { recalculateDailyClosingsFrom } = require('./cash');
   const { backupData } = req.body;
 
@@ -91,30 +93,47 @@ router.post('/restore', authenticateToken, async (req, res) => {
   }
 
   try {
-    const { transactions, cashCounts, dailyClosings, settings } = backupData.data;
+    const { transactions, bankAccounts, cashCounts, dailyClosings, settings } = backupData.data;
 
-    // Clear current data for this user
+    // 1. Clear current data for this user
     await Transaction.deleteMany({ userId });
+    await BankAccount.deleteMany({ userId });
     await CashCount.deleteMany({ userId });
     await DailyClosing.deleteMany({ userId });
 
-    // Restore transactions
+    // 2. Restore Bank Accounts
+    if (Array.isArray(bankAccounts) && bankAccounts.length > 0) {
+      const restoredBanks = bankAccounts.map(b => ({
+        id: b.id || require('crypto').randomUUID(),
+        userId,
+        name: b.name,
+        openingBalance: Number(b.openingBalance) || 0,
+        createdAt: b.createdAt || new Date(),
+        updatedAt: b.updatedAt || new Date()
+      }));
+      await BankAccount.insertMany(restoredBanks);
+    }
+
+    // 3. Restore Transactions (including transactionName and accountId)
     if (Array.isArray(transactions) && transactions.length > 0) {
       const restoredTxs = transactions.map(t => ({
         id: t.id || require('crypto').randomUUID(),
         userId,
         type: t.type,
-        amount: t.amount,
-        category: t.category,
-        paymentMethod: t.paymentMethod,
+        amount: Number(t.amount) || 0,
+        transactionName: t.transactionName || t.name || t.category || 'Transaction',
+        category: t.category || t.transactionName || '',
+        paymentMethod: t.paymentMethod || 'CASH',
+        accountId: t.accountId || null,
         description: t.description || '',
         date: t.date,
-        createdAt: t.createdAt || new Date()
+        createdAt: t.createdAt || new Date(),
+        updatedAt: t.updatedAt || new Date()
       }));
       await Transaction.insertMany(restoredTxs);
     }
 
-    // Restore cash counts
+    // 4. Restore Cash Counts
     if (Array.isArray(cashCounts) && cashCounts.length > 0) {
       const restoredCounts = cashCounts.map(c => ({
         userId,
@@ -134,7 +153,7 @@ router.post('/restore', authenticateToken, async (req, res) => {
       await CashCount.insertMany(restoredCounts);
     }
 
-    // Restore daily closings
+    // 5. Restore Daily Closings
     if (Array.isArray(dailyClosings) && dailyClosings.length > 0) {
       const restoredClosings = dailyClosings.map(cl => ({
         userId,
@@ -152,14 +171,14 @@ router.post('/restore', authenticateToken, async (req, res) => {
       await DailyClosing.insertMany(restoredClosings);
     }
 
-    // Recalculate closings sequentially to ensure consistency
+    // 6. Recalculate daily closings sequentially to ensure total mathematical consistency
     const earliestDate = '2020-01-01';
     await recalculateDailyClosingsFrom(userId, earliestDate);
 
     return res.json({ message: 'Backup restored successfully!' });
   } catch (err) {
     console.error('Error restoring backup:', err);
-    return res.status(500).json({ error: 'Failed to restore backup data' });
+    return res.status(500).json({ error: 'Failed to restore backup data: ' + err.message });
   }
 });
 

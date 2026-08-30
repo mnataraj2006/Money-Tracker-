@@ -77,7 +77,9 @@ export const bankAccountsAPI = {
   update: (id, accountData) => request(`/bank-accounts/${id}`, { method: 'PUT', body: JSON.stringify(accountData) }),
   delete: (id) => request(`/bank-accounts/${id}`, { method: 'DELETE' }),
   verifyBalance: (id, actualBalance) =>
-    request(`/bank-accounts/${id}/verify`, { method: 'POST', body: JSON.stringify({ actualBalance }) })
+    request(`/bank-accounts/${id}/verify`, { method: 'POST', body: JSON.stringify({ actualBalance }) }),
+  withdrawCash: (withdrawalData) =>
+    request('/bank-accounts/withdraw', { method: 'POST', body: JSON.stringify(withdrawalData) })
 };
 
 // CASH API

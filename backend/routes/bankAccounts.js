@@ -212,4 +212,71 @@ router.post('/:id/verify', authenticateToken, async (req, res) => {
   }
 });
 
+// 7. CASH WITHDRAWAL (BANK ACCOUNT -> PHYSICAL CASH TRANSFER)
+router.post('/withdraw', authenticateToken, async (req, res) => {
+  const userId = req.user.userId;
+  const { bankAccountId, amount, description, date } = req.body;
+
+  if (!bankAccountId) {
+    return res.status(400).json({ error: 'Please select a bank account' });
+  }
+
+  const numericAmount = parseFloat(amount);
+  if (isNaN(numericAmount) || numericAmount <= 0) {
+    return res.status(400).json({ error: 'Amount must be a positive number greater than 0' });
+  }
+
+  const txDate = date || new Date().toISOString().split('T')[0];
+
+  try {
+    // 1. Verify bank account belongs to this user
+    const bankAcc = await BankAccount.findOne({ id: bankAccountId, userId });
+    if (!bankAcc) {
+      return res.status(400).json({ error: 'Selected bank account was not found' });
+    }
+
+    // 2. Verify sufficient expected balance
+    const summary = await BankAccountService.getAccountSummary(userId, bankAccountId);
+    if (!summary) {
+      return res.status(404).json({ error: 'Bank account not found' });
+    }
+
+    if (numericAmount > summary.expectedBalance) {
+      return res.status(400).json({ error: 'Insufficient bank balance' });
+    }
+
+    // 3. Create the withdrawal transaction
+    const txId = crypto.randomUUID();
+    const cleanDescription = (description && description.trim() !== 'string') ? description.trim() : '';
+
+    const newTx = new Transaction({
+      id: txId,
+      userId,
+      type: 'CASH_WITHDRAWAL',
+      amount: numericAmount,
+      transactionName: 'Cash Withdrawal',
+      name: 'Cash Withdrawal',
+      category: '',
+      paymentMethod: 'BANK',
+      accountId: bankAccountId,
+      description: cleanDescription,
+      date: txDate
+    });
+
+    await newTx.save();
+
+    // 4. Trigger recalculation of daily closings from transaction date
+    const { recalculateDailyClosingsFrom } = require('./cash');
+    recalculateDailyClosingsFrom(userId, txDate).catch(err => console.error('Background closing recalculation error:', err));
+
+    return res.json({
+      message: 'Cash withdrawal recorded successfully',
+      transaction: newTx
+    });
+  } catch (err) {
+    console.error('Error creating cash withdrawal:', err);
+    return res.status(500).json({ error: 'Failed to record cash withdrawal' });
+  }
+});
+
 module.exports = router;

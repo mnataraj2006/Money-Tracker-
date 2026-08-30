@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Landmark, Plus, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, X, Check } from 'lucide-react';
+import { Landmark, Plus, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, X, Check, ArrowDownToLine } from 'lucide-react';
 import PageContainer from '../components/PageContainer';
+import CashWithdrawalModal from '../components/CashWithdrawalModal';
 import { bankAccountsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useDataCache } from '../context/DataContext';
@@ -15,6 +16,7 @@ export default function BanksScreen({ user, onNavigate }) {
   const [loading, setLoading] = useState(!cache.bankAccounts || cache.bankAccounts.length === 0);
   const [error, setError] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
 
   // Register Add Bank modal with back button manager
   useRegisterModal(isAddModalOpen, () => {
@@ -94,7 +96,7 @@ export default function BanksScreen({ user, onNavigate }) {
   return (
     <PageContainer>
       {/* 1. Header Section */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
             {t('bankAccounts')}
@@ -104,25 +106,47 @@ export default function BanksScreen({ user, onNavigate }) {
           </div>
         </div>
 
-        <button
-          onClick={() => {
-            setAddError('');
-            setIsAddModalOpen(true);
-          }}
-          className="btn-primary-navy"
-          style={{
-            padding: '10px 16px',
-            fontSize: '14px',
-            fontWeight: '700',
-            borderRadius: '12px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '6px',
-            width: 'auto'
-          }}
-        >
-          <Plus size={18} /> {t('addBankAccount')}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            onClick={() => setIsWithdrawModalOpen(true)}
+            style={{
+              padding: '10px 14px',
+              fontSize: '13px',
+              fontWeight: '700',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              backgroundColor: '#EEF2FF',
+              color: '#4338CA',
+              border: '1px solid #C7D2FE',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+          >
+            <ArrowDownToLine size={16} /> {t('cashWithdrawal') || 'Cash Withdrawal'}
+          </button>
+
+          <button
+            onClick={() => {
+              setAddError('');
+              setIsAddModalOpen(true);
+            }}
+            className="btn-primary-navy"
+            style={{
+              padding: '10px 16px',
+              fontSize: '13px',
+              fontWeight: '700',
+              borderRadius: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              width: 'auto'
+            }}
+          >
+            <Plus size={16} /> {t('addBankAccount')}
+          </button>
+        </div>
       </div>
 
       {/* 2. Total Bank Balance Hero Card */}
@@ -451,6 +475,15 @@ export default function BanksScreen({ user, onNavigate }) {
           </div>
         </div>
       )}
+      {/* Cash Withdrawal Modal */}
+      <CashWithdrawalModal
+        isOpen={isWithdrawModalOpen}
+        onClose={() => setIsWithdrawModalOpen(false)}
+        onSuccess={() => {
+          clearCache();
+          loadBankAccounts(false);
+        }}
+      />
     </PageContainer>
   );
 }

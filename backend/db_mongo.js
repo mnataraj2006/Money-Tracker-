@@ -48,7 +48,7 @@ const userSchema = new mongoose.Schema({
 const transactionSchema = new mongoose.Schema({
   id: { type: String, required: true, unique: true },
   userId: { type: String, required: true, index: true },
-  type: { type: String, enum: ['INCOME', 'EXPENSE'], required: true },
+  type: { type: String, enum: ['INCOME', 'EXPENSE', 'CASH_WITHDRAWAL'], required: true },
   amount: { type: Number, required: true, min: 0.01 },
   transactionName: { type: String, default: '' },
   name: { type: String, default: '' },
@@ -126,6 +126,7 @@ const dailyClosingSchema = new mongoose.Schema({
   openingCash: { type: Number, default: 0 },
   cashIncome: { type: Number, default: 0 },
   cashExpense: { type: Number, default: 0 },
+  cashWithdrawal: { type: Number, default: 0 },
   expectedClosingCash: { type: Number, default: 0 },
   physicalCash: { type: Number, default: 0 },
   difference: { type: Number, default: 0 },

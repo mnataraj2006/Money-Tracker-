@@ -122,14 +122,17 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
   // Compute daily totals
   const incomeTxs = transactions.filter(t => t.type === 'INCOME');
   const expenseTxs = transactions.filter(t => t.type === 'EXPENSE');
+  const withdrawalTxs = transactions.filter(t => t.type === 'CASH_WITHDRAWAL');
 
   const totalIncome = incomeTxs.reduce((sum, t) => sum + t.amount, 0);
   const totalExpense = expenseTxs.reduce((sum, t) => sum + t.amount, 0);
+  const totalWithdrawals = withdrawalTxs.reduce((sum, t) => sum + t.amount, 0);
   const netBalance = totalIncome - totalExpense;
 
   const cashIncome = incomeTxs.filter(t => t.paymentMethod === 'CASH').reduce((sum, t) => sum + t.amount, 0);
   const cashExpense = expenseTxs.filter(t => t.paymentMethod === 'CASH').reduce((sum, t) => sum + t.amount, 0);
-  const netCashChange = cashIncome - cashExpense;
+  const cashWithdrawal = cashData?.cashWithdrawal ?? totalWithdrawals;
+  const netCashChange = cashIncome - cashExpense + cashWithdrawal;
 
   const nonCashIncome = totalIncome - cashIncome;
   const nonCashExpense = totalExpense - cashExpense;
@@ -483,6 +486,12 @@ export default function DailyDetailsScreen({ initialDate, onBack, onNavigate, us
                 <span style={{ color: 'var(--red-expense)', fontWeight: '600' }}>− Today's Cash Expense</span>
                 <span style={{ fontWeight: '700', color: 'var(--red-expense)' }}>-{formatCurrency(cashExpense)}</span>
               </div>
+              {cashWithdrawal > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#4338CA', fontWeight: '600' }}>+ Cash Withdrawals (Bank → Cash)</span>
+                  <span style={{ fontWeight: '700', color: '#4338CA' }}>+{formatCurrency(cashWithdrawal)}</span>
+                </div>
+              )}
               <div style={{ borderTop: '1.5px solid var(--border-color)', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', fontWeight: '800', fontSize: '15px' }}>
                 <span style={{ color: 'var(--navy-primary)' }}>EXPECTED CASH</span>
                 <span style={{ color: 'var(--navy-primary)' }}>{formatCurrency(expectedClosing)}</span>

@@ -52,6 +52,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       todayBalance,
       todayCashIncome: cashData.todayCashIncome,
       todayCashExpense: cashData.todayCashExpense,
+      todayCashWithdrawal: cashData.todayCashWithdrawal || 0,
       previousDayCash: cashData.previousDayCash,
       expectedCash: cashData.expectedCash,
       physicalCash: cashData.physicalCash,
@@ -120,6 +121,7 @@ router.get('/history', authenticateToken, async (req, res) => {
           expense: 0,
           cashIncome: 0,
           cashExpense: 0,
+          cashWithdrawal: 0,
           status: 'TALLIED',
           openingCash: 0,
           expectedCash: 0,
@@ -138,6 +140,9 @@ router.get('/history', authenticateToken, async (req, res) => {
         datesMap[date].expense += amount;
         if (paymentMethod === 'CASH') datesMap[date].cashExpense += amount;
       }
+      if (type === 'CASH_WITHDRAWAL') {
+        datesMap[date].cashWithdrawal = (datesMap[date].cashWithdrawal || 0) + amount;
+      }
     });
 
     closingRows.forEach(c => {
@@ -148,6 +153,7 @@ router.get('/history', authenticateToken, async (req, res) => {
           expense: 0,
           cashIncome: c.cashIncome || 0,
           cashExpense: c.cashExpense || 0,
+          cashWithdrawal: c.cashWithdrawal || 0,
           status: c.status,
           openingCash: c.openingCash || 0,
           expectedCash: c.expectedClosingCash || 0,
@@ -159,6 +165,7 @@ router.get('/history', authenticateToken, async (req, res) => {
         datesMap[c.date].status = c.status;
         datesMap[c.date].openingCash = c.openingCash || datesMap[c.date].openingCash;
         datesMap[c.date].expectedCash = c.expectedClosingCash || datesMap[c.date].expectedCash;
+        datesMap[c.date].cashWithdrawal = c.cashWithdrawal || datesMap[c.date].cashWithdrawal || 0;
         datesMap[c.date].physicalCash = c.physicalCash;
         datesMap[c.date].difference = c.difference || 0;
       }
@@ -172,6 +179,7 @@ router.get('/history', authenticateToken, async (req, res) => {
           expense: 0,
           cashIncome: 0,
           cashExpense: 0,
+          cashWithdrawal: 0,
           status: 'TALLIED',
           openingCash: 0,
           expectedCash: cnt.physicalCash,
@@ -194,7 +202,7 @@ router.get('/history', authenticateToken, async (req, res) => {
         item.openingCash = currentOpening;
       }
       if (!item.expectedCash) {
-        item.expectedCash = item.openingCash + item.cashIncome - item.cashExpense;
+        item.expectedCash = item.openingCash + item.cashIncome - item.cashExpense + (item.cashWithdrawal || 0);
       }
       if (item.physicalCash === null || item.physicalCash === undefined) {
         item.physicalCash = item.expectedCash;
@@ -247,6 +255,7 @@ router.get('/daily-details', authenticateToken, async (req, res) => {
       openingCash: cashData.previousDayCash,
       cashIncome: cashData.todayCashIncome,
       cashExpense: cashData.todayCashExpense,
+      cashWithdrawal: cashData.todayCashWithdrawal || 0,
       expectedCash: cashData.expectedCash,
       physicalCash: cashData.physicalCash,
       difference: cashData.difference,

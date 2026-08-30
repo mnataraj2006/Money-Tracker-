@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard, Calendar, X, Filter } from 'lucide-react';
+import { Search, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard, Calendar, X, Filter, ArrowDownToLine } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -73,6 +73,7 @@ export default function TransactionsScreen({ onNavigate, user }) {
   const formatCurrency = (val) => `₹${(val || 0).toLocaleString('en-IN')}`;
 
   const getTransactionIcon = (tx) => {
+    if (tx?.type === 'CASH_WITHDRAWAL') return <ArrowDownToLine size={18} color="#4338CA" />;
     if (tx?.type === 'INCOME') return <Briefcase size={18} color="#16A34A" />;
     return <CreditCard size={18} color="#DC2626" />;
   };
@@ -327,7 +328,9 @@ export default function TransactionsScreen({ onNavigate, user }) {
         Object.keys(grouped).map((dateStr) => {
           const txs = grouped[dateStr];
           const dayTotal = txs.reduce((sum, item) => {
-            return item.type === 'INCOME' ? sum + item.amount : sum - item.amount;
+            if (item.type === 'INCOME') return sum + item.amount;
+            if (item.type === 'EXPENSE') return sum - item.amount;
+            return sum;
           }, 0);
 
           return (
@@ -366,7 +369,7 @@ export default function TransactionsScreen({ onNavigate, user }) {
                         width: '40px',
                         height: '40px',
                         borderRadius: '50%',
-                        backgroundColor: tx.type === 'INCOME' ? 'var(--green-income-bg)' : 'var(--red-expense-bg)',
+                        backgroundColor: tx.type === 'CASH_WITHDRAWAL' ? '#EEF2FF' : (tx.type === 'INCOME' ? 'var(--green-income-bg)' : 'var(--red-expense-bg)'),
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center'
@@ -375,10 +378,10 @@ export default function TransactionsScreen({ onNavigate, user }) {
                       </div>
                       <div>
                         <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
-                          {tx.transactionName || tx.name || t('unnamedTransaction')}
+                          {tx.transactionName || tx.name || (tx.type === 'CASH_WITHDRAWAL' ? (t('cashWithdrawal') || 'Cash Withdrawal') : t('unnamedTransaction'))}
                         </div>
                         <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
-                          {dateStr} • {tx.paymentMethod}{tx.description ? ` • ${tx.description}` : ''}
+                          {dateStr} • {tx.type === 'CASH_WITHDRAWAL' ? (t('cashWithdrawal') || 'Cash Withdrawal') : tx.paymentMethod}{tx.description ? ` • ${tx.description}` : ''}
                         </div>
                       </div>
                     </div>
@@ -386,7 +389,7 @@ export default function TransactionsScreen({ onNavigate, user }) {
                     <div style={{
                       fontSize: '15px',
                       fontWeight: '800',
-                      color: tx.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)'
+                      color: tx.type === 'CASH_WITHDRAWAL' ? '#4338CA' : (tx.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)')
                     }}>
                       {tx.type === 'INCOME' ? '+' : '-'}{formatCurrency(tx.amount)}
                     </div>

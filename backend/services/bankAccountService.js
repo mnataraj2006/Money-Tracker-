@@ -17,7 +17,7 @@ class BankAccountService {
 
       const accountIds = accounts.map(a => a.id);
 
-      // Fast aggregation: sum income & expense grouped by accountId and type
+      // Fast aggregation: sum income, expense, and cash withdrawals grouped by accountId and type
       // And fetch only the latest check per account using aggregation pipeline
       const [txAgg, latestChecks] = await Promise.all([
         Transaction.aggregate([
@@ -63,10 +63,11 @@ class BankAccountService {
         const accId = item._id.accountId;
         const type = item._id.type;
         if (!totalsMap[accId]) {
-          totalsMap[accId] = { income: 0, expense: 0 };
+          totalsMap[accId] = { income: 0, expense: 0, withdrawals: 0 };
         }
         if (type === 'INCOME') totalsMap[accId].income += item.total;
         if (type === 'EXPENSE') totalsMap[accId].expense += item.total;
+        if (type === 'CASH_WITHDRAWAL') totalsMap[accId].withdrawals += item.total;
       });
 
       const lastCheckMap = {};
@@ -81,9 +82,9 @@ class BankAccountService {
       });
 
       return accounts.map(acc => {
-        const totals = totalsMap[acc.id] || { income: 0, expense: 0 };
+        const totals = totalsMap[acc.id] || { income: 0, expense: 0, withdrawals: 0 };
         const opening = acc.openingBalance || 0;
-        const expectedBalance = opening + totals.income - totals.expense;
+        const expectedBalance = opening + totals.income - totals.expense - totals.withdrawals;
         const lastCheck = lastCheckMap[acc.id] || null;
 
         return {
@@ -92,6 +93,7 @@ class BankAccountService {
           openingBalance: opening,
           totalIncome: totals.income,
           totalExpense: totals.expense,
+          totalWithdrawals: totals.withdrawals,
           expectedBalance,
           lastCheck,
           createdAt: acc.createdAt,
@@ -140,13 +142,15 @@ class BankAccountService {
 
       let totalIncome = 0;
       let totalExpense = 0;
+      let totalWithdrawals = 0;
       txAgg.forEach(item => {
         if (item._id === 'INCOME') totalIncome = item.total;
         if (item._id === 'EXPENSE') totalExpense = item.total;
+        if (item._id === 'CASH_WITHDRAWAL') totalWithdrawals = item.total;
       });
 
       const openingBalance = account.openingBalance || 0;
-      const expectedBalance = openingBalance + totalIncome - totalExpense;
+      const expectedBalance = openingBalance + totalIncome - totalExpense - totalWithdrawals;
 
       return {
         id: account.id,
@@ -154,6 +158,7 @@ class BankAccountService {
         openingBalance,
         totalIncome,
         totalExpense,
+        totalWithdrawals,
         expectedBalance,
         lastCheck: recentChecks.length > 0 ? recentChecks[0] : null,
         recentChecks,

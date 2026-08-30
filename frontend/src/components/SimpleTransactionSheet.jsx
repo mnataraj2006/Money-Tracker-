@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Trash2, Save, Plus, AlertTriangle } from 'lucide-react';
+import { X, Trash2, Save, Plus, AlertTriangle, ArrowDownToLine } from 'lucide-react';
 import { transactionsAPI, bankAccountsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useDataCache } from '../context/DataContext';
@@ -57,21 +57,39 @@ export default function SimpleTransactionSheet({
       let initAcc = '';
 
       if (editTx) {
-        initType = editTx.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
-        initAmount = editTx.amount ? String(editTx.amount) : '';
-        initName = editTx.transactionName || editTx.name || '';
-        initPm = editTx.paymentMethod || 'CASH';
-        initAcc = editTx.accountId && editTx.accountId !== 'CASH' ? editTx.accountId : '';
-        const rawDesc = editTx.description || editTx.note || '';
-        initDesc = rawDesc === 'string' ? '' : rawDesc;
+        if (editTx.type === 'CASH_WITHDRAWAL') {
+          initType = 'CASH_WITHDRAWAL';
+          initAmount = editTx.amount ? String(editTx.amount) : '';
+          initName = 'Cash Withdrawal';
+          initPm = 'BANK';
+          initAcc = editTx.accountId && editTx.accountId !== 'CASH' ? editTx.accountId : '';
+          const rawDesc = editTx.description || editTx.note || '';
+          initDesc = rawDesc === 'string' ? '' : rawDesc;
 
-        setType(initType);
-        setAmount(initAmount);
-        setName(initName);
-        setPaymentMethod(initPm);
-        setAccountId(initAcc);
-        setDate(editTx.date ? editTx.date.split('T')[0] : (initialDate || todayDateStr));
-        setDescription(initDesc);
+          setType('CASH_WITHDRAWAL');
+          setAmount(initAmount);
+          setName('Cash Withdrawal');
+          setPaymentMethod('BANK');
+          setAccountId(initAcc);
+          setDate(editTx.date ? editTx.date.split('T')[0] : (initialDate || todayDateStr));
+          setDescription(initDesc);
+        } else {
+          initType = editTx.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+          initAmount = editTx.amount ? String(editTx.amount) : '';
+          initName = editTx.transactionName || editTx.name || '';
+          initPm = editTx.paymentMethod || 'CASH';
+          initAcc = editTx.accountId && editTx.accountId !== 'CASH' ? editTx.accountId : '';
+          const rawDesc = editTx.description || editTx.note || '';
+          initDesc = rawDesc === 'string' ? '' : rawDesc;
+
+          setType(initType);
+          setAmount(initAmount);
+          setName(initName);
+          setPaymentMethod(initPm);
+          setAccountId(initAcc);
+          setDate(editTx.date ? editTx.date.split('T')[0] : (initialDate || todayDateStr));
+          setDescription(initDesc);
+        }
       } else {
         initType = presetType || 'EXPENSE';
         initAmount = presetAmount ? String(presetAmount) : '';
@@ -195,7 +213,7 @@ export default function SimpleTransactionSheet({
       return;
     }
 
-    if (!name.trim()) {
+    if (type !== 'CASH_WITHDRAWAL' && !name.trim()) {
       setErrorMsg(t('pleaseEnterTxName'));
       return;
     }
@@ -205,7 +223,12 @@ export default function SimpleTransactionSheet({
       return;
     }
 
-    if (paymentMethod === 'UPI' && (!accountId || accountId === 'CASH')) {
+    if (type === 'CASH_WITHDRAWAL') {
+      if (!accountId || accountId === 'CASH') {
+        setErrorMsg(t('selectBankAccount') || 'Please select a bank account');
+        return;
+      }
+    } else if (paymentMethod === 'UPI' && (!accountId || accountId === 'CASH')) {
       setErrorMsg('Please select a Bank Account for UPI transaction');
       return;
     }
@@ -215,10 +238,10 @@ export default function SimpleTransactionSheet({
       amount: numericAmount,
       description: description.trim(),
       date: date,
-      paymentMethod: paymentMethod || 'CASH',
-      accountId: paymentMethod === 'CASH' ? 'CASH' : accountId,
-      transactionName: name.trim(),
-      name: name.trim()
+      paymentMethod: type === 'CASH_WITHDRAWAL' ? 'BANK' : (paymentMethod || 'CASH'),
+      accountId: type === 'CASH_WITHDRAWAL' ? accountId : (paymentMethod === 'CASH' ? 'CASH' : accountId),
+      transactionName: type === 'CASH_WITHDRAWAL' ? 'Cash Withdrawal' : name.trim(),
+      name: type === 'CASH_WITHDRAWAL' ? 'Cash Withdrawal' : name.trim()
     };
 
     try {
@@ -278,7 +301,7 @@ export default function SimpleTransactionSheet({
               textAlign: 'center',
               flex: 1
             }}>
-              {editTx ? t('editTransaction') : t('newTransaction')}
+              {editTx ? (type === 'CASH_WITHDRAWAL' ? (t('cashWithdrawal') || 'Cash Withdrawal') : t('editTransaction')) : t('newTransaction')}
             </h3>
 
             <button
@@ -325,74 +348,96 @@ export default function SimpleTransactionSheet({
             </div>
           )}
 
-          {/* Income / Expense Toggle Switch */}
-          <div className="type-toggle-bar" style={{ display: 'flex', background: '#F1F5F9', borderRadius: '10px', padding: '4px', marginBottom: '20px' }}>
-            <button
-              type="button"
-              className={`type-toggle-btn ${type === 'INCOME' ? 'active income' : ''}`}
-              onClick={() => setType('INCOME')}
-              style={{
-                flex: 1,
-                padding: '12px 0',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '17px',
-                fontWeight: '800',
-                cursor: 'pointer',
-                background: type === 'INCOME' ? '#16A34A' : 'transparent',
-                color: type === 'INCOME' ? '#FFFFFF' : '#64748B'
-              }}
-            >
-              {t('income')}
-            </button>
-            <button
-              type="button"
-              className={`type-toggle-btn ${type === 'EXPENSE' ? 'active expense' : ''}`}
-              onClick={() => setType('EXPENSE')}
-              style={{
-                flex: 1,
-                padding: '12px 0',
-                border: 'none',
-                borderRadius: '8px',
-                fontSize: '17px',
-                fontWeight: '800',
-                cursor: 'pointer',
-                background: type === 'EXPENSE' ? '#DC2626' : 'transparent',
-                color: type === 'EXPENSE' ? '#FFFFFF' : '#64748B'
-              }}
-            >
-              {t('expense')}
-            </button>
-          </div>
+          {/* Income / Expense Toggle Switch or Withdrawal Banner */}
+          {type === 'CASH_WITHDRAWAL' ? (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              background: '#EEF2FF',
+              color: '#4338CA',
+              padding: '12px 16px',
+              borderRadius: '12px',
+              fontWeight: '800',
+              fontSize: '14px',
+              marginBottom: '20px',
+              border: '1px solid #C7D2FE'
+            }}>
+              <ArrowDownToLine size={18} />
+              <span>{t('cashWithdrawalSubtitle') || 'Bank Account → Physical Cash'}</span>
+            </div>
+          ) : (
+            <div className="type-toggle-bar" style={{ display: 'flex', background: '#F1F5F9', borderRadius: '10px', padding: '4px', marginBottom: '20px' }}>
+              <button
+                type="button"
+                className={`type-toggle-btn ${type === 'INCOME' ? 'active income' : ''}`}
+                onClick={() => setType('INCOME')}
+                style={{
+                  flex: 1,
+                  padding: '12px 0',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '17px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  background: type === 'INCOME' ? '#16A34A' : 'transparent',
+                  color: type === 'INCOME' ? '#FFFFFF' : '#64748B'
+                }}
+              >
+                {t('income')}
+              </button>
+              <button
+                type="button"
+                className={`type-toggle-btn ${type === 'EXPENSE' ? 'active expense' : ''}`}
+                onClick={() => setType('EXPENSE')}
+                style={{
+                  flex: 1,
+                  padding: '12px 0',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '17px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  background: type === 'EXPENSE' ? '#DC2626' : 'transparent',
+                  color: type === 'EXPENSE' ? '#FFFFFF' : '#64748B'
+                }}
+              >
+                {t('expense')}
+              </button>
+            </div>
+          )}
 
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {/* 1. Transaction Name Field with Autocomplete */}
-            <div className="sheet-field-group">
-              <label className="sheet-field-label" style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
-                1 &nbsp; {t('transactionName')}
-              </label>
-              <TransactionNameAutocomplete
-                className="sheet-input"
-                placeholder={t('enterTransactionName')}
-                value={name}
-                onChange={(val) => setName(val)}
-                inputStyle={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  fontSize: '16px',
-                  borderRadius: '10px',
-                  border: '1.5px solid #CBD5E1',
-                  outline: 'none',
-                  background: '#FAFAFA'
-                }}
-                required
-              />
-            </div>
+            {/* 1. Transaction Name Field with Autocomplete (hidden for CASH_WITHDRAWAL) */}
+            {type !== 'CASH_WITHDRAWAL' && (
+              <div className="sheet-field-group">
+                <label className="sheet-field-label" style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
+                  1 &nbsp; {t('transactionName')}
+                </label>
+                <TransactionNameAutocomplete
+                  className="sheet-input"
+                  placeholder={t('enterTransactionName')}
+                  value={name}
+                  onChange={(val) => setName(val)}
+                  inputStyle={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    fontSize: '16px',
+                    borderRadius: '10px',
+                    border: '1.5px solid #CBD5E1',
+                    outline: 'none',
+                    background: '#FAFAFA'
+                  }}
+                  required
+                />
+              </div>
+            )}
 
             {/* 2. Amount Field */}
             <div className="sheet-field-group">
               <label className="sheet-field-label" style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
-                2 &nbsp; {t('amount')}
+                {type === 'CASH_WITHDRAWAL' ? '1' : '2'} &nbsp; {t('amount')}
               </label>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <span style={{ position: 'absolute', left: '16px', fontSize: '24px', fontWeight: '800', color: '#1E293B' }}>₹</span>
@@ -421,7 +466,7 @@ export default function SimpleTransactionSheet({
             {/* 3. Description Field (Optional) */}
             <div className="sheet-field-group">
               <label className="sheet-field-label" style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
-                3 &nbsp; {t('descriptionOptional')}
+                {type === 'CASH_WITHDRAWAL' ? '2' : '3'} &nbsp; {t('descriptionOptional')}
               </label>
               <input
                 type="text"
@@ -441,115 +486,146 @@ export default function SimpleTransactionSheet({
               />
             </div>
 
-            {/* 4. Payment Method Field */}
-            <div className="sheet-field-group">
-              <label className="sheet-field-label" style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
-                4 &nbsp; {t('paymentMethod')}
-              </label>
-              <select
-                value={paymentMethod}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  setPaymentMethod(val);
-                  if (val === 'CASH') {
-                    setAccountId('CASH');
-                  } else if (val === 'UPI' && (!accountId || accountId === 'CASH')) {
-                    if (bankAccounts.length > 0) {
-                      setAccountId(bankAccounts[0].id);
-                    } else {
-                      setAccountId('');
+            {/* 4. Payment Method Field or Bank Account Field for Withdrawal */}
+            {type === 'CASH_WITHDRAWAL' ? (
+              <div className="sheet-field-group">
+                <label className="sheet-field-label" style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
+                  3 &nbsp; {t('bankAccount')} *
+                </label>
+                <select
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    borderRadius: '10px',
+                    border: !accountId ? '2px solid #F59E0B' : '1.5px solid #CBD5E1',
+                    outline: 'none',
+                    background: '#FAFAFA',
+                    color: '#1E293B'
+                  }}
+                  required
+                >
+                  <option value="" disabled>-- {t('selectBankAccount')} --</option>
+                  {bankAccounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name} (₹{Math.round(acc.expectedBalance || 0).toLocaleString('en-IN')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <div className="sheet-field-group">
+                <label className="sheet-field-label" style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B' }}>
+                  4 &nbsp; {t('paymentMethod')}
+                </label>
+                <select
+                  value={paymentMethod}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setPaymentMethod(val);
+                    if (val === 'CASH') {
+                      setAccountId('CASH');
+                    } else if (val === 'UPI' && (!accountId || accountId === 'CASH')) {
+                      if (bankAccounts.length > 0) {
+                        setAccountId(bankAccounts[0].id);
+                      } else {
+                        setAccountId('');
+                      }
                     }
-                  }
-                }}
-                style={{
-                  width: '100%',
-                  padding: '14px 16px',
-                  fontSize: '15px',
-                  fontWeight: '600',
-                  borderRadius: '10px',
-                  border: '1.5px solid #CBD5E1',
-                  outline: 'none',
-                  background: '#FAFAFA',
-                  color: '#1E293B'
-                }}
-              >
-                <option value="CASH">Cash (Modifies Cash at Home)</option>
-                <option value="UPI">UPI</option>
-              </select>
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '14px 16px',
+                    fontSize: '15px',
+                    fontWeight: '600',
+                    borderRadius: '10px',
+                    border: '1.5px solid #CBD5E1',
+                    outline: 'none',
+                    background: '#FAFAFA',
+                    color: '#1E293B'
+                  }}
+                >
+                  <option value="CASH">Cash (Modifies Cash at Home)</option>
+                  <option value="UPI">UPI</option>
+                </select>
 
-              {/* Conditional Bank Account Selector when UPI is chosen */}
-              {paymentMethod === 'UPI' && (
-                <div style={{ marginTop: '10px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                    <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>
-                      {t('bankAccount')} *
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setQuickBankError('');
-                        setQuickBankName('');
-                        setQuickOpeningBalance('');
-                        setShowAddBankModal(true);
+                {/* Conditional Bank Account Selector when UPI is chosen */}
+                {paymentMethod === 'UPI' && (
+                  <div style={{ marginTop: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                      <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B' }}>
+                        {t('bankAccount')} *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setQuickBankError('');
+                          setQuickBankName('');
+                          setQuickOpeningBalance('');
+                          setShowAddBankModal(true);
+                        }}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#16247B',
+                          fontSize: '13px',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px'
+                        }}
+                      >
+                        <Plus size={14} /> {t('addBankAccount')}
+                      </button>
+                    </div>
+
+                    <select
+                      value={accountId}
+                      onChange={(e) => {
+                        if (e.target.value === '__ADD_NEW__') {
+                          setQuickBankError('');
+                          setQuickBankName('');
+                          setQuickOpeningBalance('');
+                          setShowAddBankModal(true);
+                        } else {
+                          setAccountId(e.target.value);
+                        }
                       }}
                       style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#16247B',
-                        fontSize: '13px',
-                        fontWeight: '700',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px'
+                        width: '100%',
+                        padding: '14px 16px',
+                        fontSize: '15px',
+                        fontWeight: '600',
+                        borderRadius: '10px',
+                        border: !accountId ? '2px solid #F59E0B' : '1.5px solid #CBD5E1',
+                        outline: 'none',
+                        background: '#FAFAFA',
+                        color: '#1E293B'
                       }}
+                      required
                     >
-                      <Plus size={14} /> {t('addBankAccount')}
-                    </button>
+                      <option value="" disabled>-- {t('selectBankAccount')} --</option>
+                      {bankAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name} (₹{Math.round(acc.expectedBalance || 0).toLocaleString('en-IN')})
+                        </option>
+                      ))}
+                      <option value="__ADD_NEW__">+ {t('addBankAccount')}</option>
+                    </select>
+
+                    {!accountId && (
+                      <div style={{ fontSize: '12px', color: '#D97706', marginTop: '4px', fontWeight: '600' }}>
+                        ⚠️ Please select or add a bank account for this UPI transaction.
+                      </div>
+                    )}
                   </div>
-
-                  <select
-                    value={accountId}
-                    onChange={(e) => {
-                      if (e.target.value === '__ADD_NEW__') {
-                        setQuickBankError('');
-                        setQuickBankName('');
-                        setQuickOpeningBalance('');
-                        setShowAddBankModal(true);
-                      } else {
-                        setAccountId(e.target.value);
-                      }
-                    }}
-                    style={{
-                      width: '100%',
-                      padding: '14px 16px',
-                      fontSize: '15px',
-                      fontWeight: '600',
-                      borderRadius: '10px',
-                      border: !accountId ? '2px solid #F59E0B' : '1.5px solid #CBD5E1',
-                      outline: 'none',
-                      background: '#FAFAFA',
-                      color: '#1E293B'
-                    }}
-                    required
-                  >
-                    <option value="" disabled>-- {t('selectBankAccount')} --</option>
-                    {bankAccounts.map((acc) => (
-                      <option key={acc.id} value={acc.id}>
-                        {acc.name} (₹{Math.round(acc.expectedBalance || 0).toLocaleString('en-IN')})
-                      </option>
-                    ))}
-                    <option value="__ADD_NEW__">+ {t('addBankAccount')}</option>
-                  </select>
-
-                  {!accountId && (
-                    <div style={{ fontSize: '12px', color: '#D97706', marginTop: '4px', fontWeight: '600' }}>
-                      ⚠️ Please select or add a bank account for this UPI transaction.
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            )}
 
             {/* 5. Date Field */}
             <div className="sheet-field-group">

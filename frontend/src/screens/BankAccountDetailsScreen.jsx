@@ -243,8 +243,8 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
         </div>
       </div>
 
-      {/* 3. Account Financial Summary Cards (Income / Expense / Opening Balance) */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '20px' }}>
+      {/* 3. Account Financial Summary Cards (Income / Expense / Withdrawals / Opening Balance) */}
+      <div style={{ display: 'grid', gridTemplateColumns: account.totalWithdrawals > 0 ? 'repeat(auto-fit, minmax(80px, 1fr))' : '1fr 1fr 1fr', gap: '8px', marginBottom: '20px' }}>
         {/* Income */}
         <div className="stitch-card" style={{ padding: '12px', textAlign: 'center' }}>
           <div style={{ fontSize: '11px', fontWeight: '700', color: '#16A34A', textTransform: 'uppercase' }}>
@@ -264,6 +264,18 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
             {formatCurrency(account.totalExpense)}
           </div>
         </div>
+
+        {/* Withdrawals (if any) */}
+        {account.totalWithdrawals > 0 && (
+          <div className="stitch-card" style={{ padding: '12px', textAlign: 'center' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', color: '#4338CA', textTransform: 'uppercase' }}>
+              - {t('withdrawal') || 'Withdrawal'}
+            </div>
+            <div style={{ fontSize: '16px', fontWeight: '800', color: '#4338CA', marginTop: '4px' }}>
+              {formatCurrency(account.totalWithdrawals)}
+            </div>
+          </div>
+        )}
 
         {/* Opening Balance */}
         <div className="stitch-card" style={{ padding: '12px', textAlign: 'center' }}>
@@ -285,7 +297,7 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
         {!account.transactions || account.transactions.length === 0 ? (
           <div className="stitch-card" style={{ padding: '30px 20px', textAlign: 'center', color: '#64748B' }}>
             <p style={{ margin: 0, fontSize: '14px', fontWeight: '600' }}>
-              No UPI transactions recorded for {account.name} yet.
+              No transactions recorded for {account.name} yet.
             </p>
           </div>
         ) : (
@@ -309,17 +321,17 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
               >
                 <div>
                   <div style={{ fontSize: '15px', fontWeight: '700', color: '#1E293B' }}>
-                    {tx.transactionName || tx.name || 'Unnamed Transaction'}
+                    {tx.transactionName || tx.name || (tx.type === 'CASH_WITHDRAWAL' ? (t('cashWithdrawal') || 'Cash Withdrawal') : 'Unnamed Transaction')}
                   </div>
                   <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', fontWeight: '600' }}>
-                    {tx.date} • {tx.paymentMethod} {tx.description ? `• ${tx.description}` : ''}
+                    {tx.date} • {tx.type === 'CASH_WITHDRAWAL' ? (t('cashWithdrawal') || 'Cash Withdrawal') : tx.paymentMethod} {tx.description ? `• ${tx.description}` : ''}
                   </div>
                 </div>
 
                 <div style={{
                   fontSize: '16px',
                   fontWeight: '800',
-                  color: tx.type === 'INCOME' ? '#16A34A' : '#DC2626'
+                  color: tx.type === 'CASH_WITHDRAWAL' ? '#4338CA' : (tx.type === 'INCOME' ? '#16A34A' : '#DC2626')
                 }}>
                   {tx.type === 'INCOME' ? '+' : '-'}{formatCurrency(tx.amount)}
                 </div>
