@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Mic, ArrowDown, ArrowUp, CheckCircle, AlertTriangle, ChevronRight, ShoppingBag, Coffee, Briefcase, Utensils, CreditCard, RotateCcw, Landmark } from 'lucide-react';
+import { Plus, Minus, Mic, ArrowDown, ArrowUp, CheckCircle, AlertTriangle, ChevronRight, ShoppingBag, Coffee, Briefcase, Utensils, CreditCard, RotateCcw, Landmark, FileText } from 'lucide-react';
 import { summaryAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useDataCache } from '../context/DataContext';
@@ -219,14 +219,39 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
 
   return (
     <PageContainer>
-      {/* 1. Header (Greeting & Date) */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-        <h1 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>
-          {getGreeting()}
-        </h1>
-        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>
-          {getFormattedTodayDate()}
+      {/* 1. Header (Greeting, Date & Reports Button) */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+          <h1 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>
+            {getGreeting()}
+          </h1>
+          <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>
+            {getFormattedTodayDate()}
+          </div>
         </div>
+
+        {/* Reports Entry Button */}
+        <button
+          onClick={() => onNavigate('reports')}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            padding: '8px 14px',
+            borderRadius: '10px',
+            border: '1px solid var(--border-color, #E2E8F0)',
+            background: 'var(--bg-card, #FFFFFF)',
+            color: 'var(--navy-primary, #1E293B)',
+            fontSize: '13px',
+            fontWeight: '700',
+            cursor: 'pointer',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.05)',
+            userSelect: 'none'
+          }}
+        >
+          <FileText size={16} color="var(--navy-primary, #1E293B)" />
+          <span>{t('reports') || 'Reports'}</span>
+        </button>
       </div>
 
       {/* 2. Today's Summary (Equal Income & Expense Cards, NO Net Today) */}

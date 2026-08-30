@@ -280,7 +280,15 @@ export const translations = {
     enterWithdrawalAmount: 'Enter withdrawal amount',
     withdrawing: 'Withdrawing...',
     withdrawal: 'Withdrawal',
-    cashWithdrawals: 'Cash Withdrawals'
+    cashWithdrawals: 'Cash Withdrawals',
+
+    // Reports
+    reports: 'Reports',
+    generatePdf: 'Generate PDF',
+    singleDay: 'Single Day',
+    dateRange: 'Date Range',
+    dailyFinancialReport: 'Daily Financial Report',
+    downloadPdf: 'Download PDF'
   },
   ta: {
     // Navigation
@@ -561,6 +569,14 @@ export const translations = {
     enterWithdrawalAmount: 'எடுக்கும் தொகையை உள்ளிடவும்',
     withdrawing: 'பதிவாகிறது...',
     withdrawal: 'ரொக்க எடுப்பு',
-    cashWithdrawals: 'ரொக்க எடுப்புகள்'
+    cashWithdrawals: 'ரொக்க எடுப்புகள்',
+
+    // Reports
+    reports: 'அறிக்கைகள்',
+    generatePdf: 'PDF அறிக்கையை உருவாக்கவும்',
+    singleDay: 'ஒற்றை நாள்',
+    dateRange: 'தேதி வரம்பு',
+    dailyFinancialReport: 'தினசரி நிதி அறிக்கை',
+    downloadPdf: 'PDF பதிவிறக்கம்'
   }
 };

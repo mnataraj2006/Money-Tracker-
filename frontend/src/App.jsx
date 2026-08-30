@@ -18,6 +18,7 @@ import DailyDetailsScreen from './screens/DailyDetailsScreen';
 import SimplePassbookView from './screens/SimplePassbookView';
 import BanksScreen from './screens/BanksScreen';
 import BankAccountDetailsScreen from './screens/BankAccountDetailsScreen';
+import ReportsScreen from './screens/ReportsScreen';
 import SplashScreen from './components/SplashScreen';
 import { authAPI, settingsAPI } from './services/api';
 import { checkAndRunScheduledBackup } from './services/backupScheduler';
@@ -191,6 +192,14 @@ function AppContent() {
           {currentScreen === 'daily-details' && (
             <DailyDetailsScreen
               initialDate={screenParams.date}
+              onBack={goBack}
+              onNavigate={navigateTo}
+              user={user}
+            />
+          )}
+
+          {currentScreen === 'reports' && (
+            <ReportsScreen
               onBack={goBack}
               onNavigate={navigateTo}
               user={user}

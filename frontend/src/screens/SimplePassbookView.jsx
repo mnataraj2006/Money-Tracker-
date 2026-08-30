@@ -71,16 +71,21 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
     }
   };
 
+  const shiftDate = (dateStr, days) => {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d + days);
+    const year = dateObj.getFullYear();
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+    const day = String(dateObj.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const handlePrevDay = () => {
-    const d = new Date(currentDate + 'T00:00:00');
-    d.setDate(d.getDate() - 1);
-    setCurrentDate(d.toISOString().split('T')[0]);
+    setCurrentDate(prev => shiftDate(prev, -1));
   };
 
   const handleNextDay = () => {
-    const d = new Date(currentDate + 'T00:00:00');
-    d.setDate(d.getDate() + 1);
-    setCurrentDate(d.toISOString().split('T')[0]);
+    setCurrentDate(prev => shiftDate(prev, 1));
   };
 
   const handleTodayClick = () => {

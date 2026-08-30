@@ -229,20 +229,32 @@ router.get('/daily-details', authenticateToken, async (req, res) => {
   const targetDate = req.query.date || new Date().toISOString().split('T')[0];
 
   try {
-    const [cashData, dateTxs, countRow, closingRow] = await Promise.all([
+    const [cashData, dateTxs, countRow, closingRow, bankAccounts] = await Promise.all([
       CashCalculationService.getExpectedCash(userId, targetDate),
       Transaction.find({ userId, date: targetDate })
         .sort({ createdAt: -1 })
         .select('id type amount name transactionName category paymentMethod accountId description date createdAt')
         .lean(),
       CashCount.findOne({ userId, date: targetDate }).sort({ createdAt: -1 }).lean(),
-      DailyClosing.findOne({ userId, date: targetDate }).lean()
+      DailyClosing.findOne({ userId, date: targetDate }).lean(),
+      BankAccountService.getAllAccountsSummary(userId)
     ]);
+
+    const bankMap = {};
+    (bankAccounts || []).forEach(b => { bankMap[b.id] = b.name; });
+
+    const enrichedTransactions = dateTxs.map(tx => ({
+      ...tx,
+      transactionName: (tx.transactionName && tx.transactionName.trim())
+        ? tx.transactionName.trim()
+        : ((tx.name && tx.name.trim()) ? tx.name.trim() : (tx.type === 'CASH_WITHDRAWAL' ? 'Cash Withdrawal' : 'Unnamed Transaction')),
+      accountName: tx.accountId && tx.accountId !== 'CASH' ? (bankMap[tx.accountId] || 'Bank') : (tx.paymentMethod === 'CASH' ? 'Cash' : '')
+    }));
 
     let dayIncome = 0;
     let dayExpense = 0;
 
-    dateTxs.forEach(t => {
+    enrichedTransactions.forEach(t => {
       if (t.type === 'INCOME') dayIncome += t.amount;
       if (t.type === 'EXPENSE') dayExpense += t.amount;
     });
@@ -263,7 +275,8 @@ router.get('/daily-details', authenticateToken, async (req, res) => {
       isClosed: cashData.isClosed,
       counts: countRow || null,
       closingRow: closingRow || null,
-      transactions: dateTxs
+      bankAccounts: bankAccounts || [],
+      transactions: enrichedTransactions
     });
   } catch (err) {
     console.error('Error fetching daily details:', err);
