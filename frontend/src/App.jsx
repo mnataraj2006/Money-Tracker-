@@ -18,17 +18,26 @@ import DailyDetailsScreen from './screens/DailyDetailsScreen';
 import SimplePassbookView from './screens/SimplePassbookView';
 import BanksScreen from './screens/BanksScreen';
 import BankAccountDetailsScreen from './screens/BankAccountDetailsScreen';
+import SplashScreen from './components/SplashScreen';
 import { authAPI, settingsAPI } from './services/api';
 import { LanguageProvider } from './context/LanguageContext';
 import { DataProvider } from './context/DataContext';
+import { NavigationProvider, useNavigation } from './context/NavigationContext';
 
 function AppContent() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [currentScreen, setCurrentScreen] = useState('login');
-  const [screenParams, setScreenParams] = useState({});
-  const [activeTab, setActiveTab] = useState('home');
   const [viewMode, setViewMode] = useState(() => localStorage.getItem('money_tracker_app_view') || 'normal');
+
+  const {
+    currentScreen,
+    setCurrentScreen,
+    screenParams,
+    activeTab,
+    navigateTo,
+    handleTabChange,
+    goBack
+  } = useNavigation();
 
   useEffect(() => {
     checkAuth();
@@ -41,8 +50,7 @@ function AppContent() {
       try {
         const data = await authAPI.getMe();
         setUser(data.user);
-        setCurrentScreen('home');
-        setActiveTab('home');
+        navigateTo('home');
         setLoading(false);
         return;
       } catch (err) {
@@ -82,8 +90,7 @@ function AppContent() {
 
   const handleLoginSuccess = (userData) => {
     setUser(userData);
-    setCurrentScreen('home');
-    setActiveTab('home');
+    navigateTo('home');
     checkAutomatedWeeklyBackup();
   };
 
@@ -98,25 +105,8 @@ function AppContent() {
     setCurrentScreen('login');
   };
 
-  const navigateTo = (screen, params = {}) => {
-    setCurrentScreen(screen);
-    setScreenParams(params);
-    if (['home', 'transactions', 'banks', 'history', 'settings'].includes(screen)) {
-      setActiveTab(screen);
-    }
-  };
-
-  const handleTabChange = (tabId) => {
-    setActiveTab(tabId);
-    setCurrentScreen(tabId);
-  };
-
   if (loading) {
-    return (
-      <div className="mobile-app-shell" style={{ justifyContent: 'center', alignItems: 'center', color: '#FFF' }}>
-        <div style={{ fontSize: '18px', fontWeight: '700' }}>Cashly...</div>
-      </div>
-    );
+    return <SplashScreen />;
   }
 
   const isMainTabScreen = user && ['home', 'transactions', 'banks', 'history', 'settings'].includes(currentScreen);
@@ -149,13 +139,13 @@ function AppContent() {
       ) : (
         <>
           {currentScreen === 'cash' && (
-            <CashAtHomeScreen user={user} onNavigate={navigateTo} onBack={() => navigateTo('home')} />
+            <CashAtHomeScreen user={user} onNavigate={navigateTo} onBack={goBack} />
           )}
 
           {currentScreen === 'bank-account-details' && (
             <BankAccountDetailsScreen
               accountId={screenParams.accountId}
-              onBack={() => navigateTo('banks')}
+              onBack={goBack}
               onNavigate={navigateTo}
             />
           )}
@@ -164,7 +154,7 @@ function AppContent() {
             <AddIncomeScreen
               initialDate={screenParams.date}
               editTx={screenParams.editTx}
-              onBack={() => navigateTo(screenParams.from || 'home')}
+              onBack={goBack}
               onSuccess={() => navigateTo(screenParams.from || 'transactions')}
             />
           )}
@@ -173,7 +163,7 @@ function AppContent() {
             <AddExpenseScreen
               initialDate={screenParams.date}
               editTx={screenParams.editTx}
-              onBack={() => navigateTo(screenParams.from || 'home')}
+              onBack={goBack}
               onSuccess={() => navigateTo(screenParams.from || 'transactions')}
             />
           )}
@@ -181,7 +171,7 @@ function AppContent() {
           {currentScreen === 'transaction-details' && (
             <TransactionDetailsScreen
               txId={screenParams.txId}
-              onBack={() => navigateTo('transactions')}
+              onBack={goBack}
               onNavigate={navigateTo}
             />
           )}
@@ -189,7 +179,7 @@ function AppContent() {
           {currentScreen === 'count-cash' && (
             <CountCashScreen
               targetDate={screenParams.targetDate || screenParams.date}
-              onBack={() => navigateTo(screenParams.from || 'cash')}
+              onBack={goBack}
               onReconciliationSuccess={(reconciliationData) =>
                 navigateTo('reconciliation', { reconciliation: reconciliationData })
               }
@@ -208,7 +198,7 @@ function AppContent() {
           {currentScreen === 'close-day' && (
             <CloseDayScreen
               user={user}
-              onBack={() => navigateTo('cash')}
+              onBack={goBack}
               onCloseSuccess={() => navigateTo('home')}
             />
           )}
@@ -216,7 +206,7 @@ function AppContent() {
           {currentScreen === 'monthly-summary' && (
             <MonthlySummaryScreen
               month={screenParams.month}
-              onBack={() => navigateTo('history')}
+              onBack={goBack}
               user={user}
             />
           )}
@@ -224,7 +214,7 @@ function AppContent() {
           {currentScreen === 'daily-details' && (
             <DailyDetailsScreen
               initialDate={screenParams.date}
-              onBack={() => navigateTo('history')}
+              onBack={goBack}
               onNavigate={navigateTo}
               user={user}
             />
@@ -239,7 +229,9 @@ export default function App() {
   return (
     <LanguageProvider>
       <DataProvider>
-        <AppContent />
+        <NavigationProvider>
+          <AppContent />
+        </NavigationProvider>
       </DataProvider>
     </LanguageProvider>
   );

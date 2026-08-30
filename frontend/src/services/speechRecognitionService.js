@@ -1,126 +1,164 @@
 /**
- * Robust Zero-Cost High-Accuracy Web Speech Recognition Service
- * Configures ta-IN / en-IN, continuous listening, silence handling, and single-source event.results reconstruction.
+ * High-Reliability Speech Recognition Service for Cashly
+ * Works consistently across Android WebView APK and Desktop Browsers.
  */
 
 class SpeechRecognitionService {
   constructor() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    this.isSupported = !!SpeechRecognition;
     this.recognition = null;
     this.isListening = false;
+    this.silenceTimer = null;
+    this.latestTranscript = '';
+  }
 
-    if (this.isSupported) {
-      this.recognition = new SpeechRecognition();
-      this.recognition.continuous = true;
-      this.recognition.interimResults = true;
-      try {
-        this.recognition.maxAlternatives = 3;
-      } catch (e) {
-        // Safe fallback if maxAlternatives isn't writable in Android WebView
-        this.recognition.maxAlternatives = 1;
+  /**
+   * Check if speech recognition is available in the current environment
+   */
+  isAvailable() {
+    return !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  }
+
+  /**
+   * Request microphone permissions explicitly
+   */
+  async requestPermission() {
+    try {
+      if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        stream.getTracks().forEach(track => {
+          try {
+            track.stop();
+          } catch (e) {}
+        });
+        return { granted: true };
       }
+      return { granted: true };
+    } catch (err) {
+      console.warn('Microphone permission request:', err);
+      const isDenied = err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError';
+      return {
+        granted: false,
+        message: isDenied
+          ? 'Microphone permission denied. Please allow microphone access in app settings.'
+          : 'Could not access device microphone.'
+      };
     }
   }
 
   /**
-   * Start high-accuracy voice recognition
-   * @param {Object} options
-   * @param {string} options.language - 'ta', 'en', 'auto'
-   * @param {function} options.onResult - Callback (transcript, isFinal)
-   * @param {function} options.onError - Callback (errorMessage)
-   * @param {function} options.onEnd - Callback ()
+   * Start speech recognition session
    */
-  startListening({ language = 'ta', onResult, onError, onEnd }) {
-    if (!this.isSupported) {
-      if (onError) onError('Speech recognition is not supported on this browser/device.');
-      return false;
-    }
-
+  async startListening({ language = 'ta-IN', onResult, onError, onEnd }) {
     if (this.isListening) {
       this.stopListening();
     }
 
-    // Explicit locale configuration
-    if (language === 'en') {
-      this.recognition.lang = 'en-IN';
-    } else {
-      // Default to Tamil (ta-IN)
-      this.recognition.lang = 'ta-IN';
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      if (onError) onError('Speech recognition is not supported on this device.');
+      return false;
     }
 
-    let silenceTimer = null;
-
-    const resetSilenceTimer = () => {
-      if (silenceTimer) clearTimeout(silenceTimer);
-      silenceTimer = setTimeout(() => {
-        if (this.isListening) {
-          this.stopListening();
-        }
-      }, 4500); // 4.5 second buffer for natural pauses
-    };
-
-    this.recognition.onstart = () => {
-      this.isListening = true;
-      resetSilenceTimer();
-    };
-
-    this.recognition.onresult = (event) => {
-      resetSilenceTimer();
-
-      let finalTranscript = '';
-      let interimTranscript = '';
-
-      // Single source of truth reconstruction from event.results
-      for (let i = 0; i < event.results.length; ++i) {
-        const result = event.results[i];
-        if (result.isFinal) {
-          finalTranscript += result[0].transcript + ' ';
-        } else {
-          interimTranscript += result[0].transcript;
-        }
-      }
-
-      const currentText = (finalTranscript + interimTranscript).trim();
-      const lastIdx = event.results.length - 1;
-      const isFinal = lastIdx >= 0 ? event.results[lastIdx].isFinal : false;
-
-      if (onResult && currentText) {
-        onResult(currentText, isFinal);
-      }
-    };
-
-    this.recognition.onerror = (event) => {
-      this.isListening = false;
-      if (silenceTimer) clearTimeout(silenceTimer);
-
-      let errorMsg = 'Voice recognition error occurred.';
-      if (event.error === 'not-allowed' || event.error === 'permission-denied') {
-        errorMsg = 'Microphone permission denied. Please allow microphone access in device settings.';
-      } else if (event.error === 'no-speech') {
-        errorMsg = 'No speech detected. Please speak into your microphone.';
-      } else if (event.error === 'audio-capture') {
-        errorMsg = 'No microphone was found on your device.';
-      } else if (event.error === 'network') {
-        errorMsg = 'Network connection required for speech recognition.';
-      } else if (event.error === 'aborted') {
-        return; // Normal user abort
-      }
-
-      if (onError) onError(errorMsg);
-    };
-
-    this.recognition.onend = () => {
-      this.isListening = false;
-      if (silenceTimer) clearTimeout(silenceTimer);
-      if (onEnd) onEnd();
-    };
+    // Request mic access first
+    const perm = await this.requestPermission();
+    if (!perm.granted) {
+      if (onError) onError(perm.message || 'Microphone permission required');
+      return false;
+    }
 
     try {
+      let targetLang = 'ta-IN';
+      const cleanLang = (language || '').toLowerCase().trim();
+      if (cleanLang.startsWith('en')) {
+        targetLang = 'en-IN';
+      } else {
+        targetLang = 'ta-IN';
+      }
+
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = false;
+      this.recognition.interimResults = true;
+      this.recognition.lang = targetLang;
+
+      try {
+        this.recognition.maxAlternatives = 1;
+      } catch (e) {}
+
+      let accumulatedFinal = '';
+      this.latestTranscript = '';
+
+      const resetSilenceTimer = () => {
+        if (this.silenceTimer) clearTimeout(this.silenceTimer);
+        this.silenceTimer = setTimeout(() => {
+          if (this.isListening) {
+            this.stopListening();
+          }
+        }, 4000);
+      };
+
+      this.recognition.onstart = () => {
+        this.isListening = true;
+        resetSilenceTimer();
+      };
+
+      this.recognition.onresult = (event) => {
+        resetSilenceTimer();
+
+        let interimStr = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const item = event.results[i];
+          if (item.isFinal) {
+            accumulatedFinal += (accumulatedFinal ? ' ' : '') + item[0].transcript.trim();
+          } else {
+            interimStr += item[0].transcript;
+          }
+        }
+
+        const currentCombined = (accumulatedFinal + (interimStr ? ' ' + interimStr : '')).trim();
+        const lastIdx = event.results.length - 1;
+        const isFinal = lastIdx >= 0 ? event.results[lastIdx].isFinal : false;
+
+        this.latestTranscript = currentCombined;
+
+        if (onResult && currentCombined) {
+          onResult(currentCombined, isFinal);
+        }
+      };
+
+      this.recognition.onerror = (event) => {
+        this.isListening = false;
+        if (this.silenceTimer) clearTimeout(this.silenceTimer);
+
+        if (event.error === 'aborted') {
+          return;
+        }
+
+        let errorMsg = 'Voice recognition error occurred.';
+        if (event.error === 'not-allowed' || event.error === 'permission-denied') {
+          errorMsg = 'Microphone permission denied. Please allow microphone access.';
+        } else if (event.error === 'no-speech') {
+          errorMsg = 'No speech detected. Please speak clearly.';
+        } else if (event.error === 'audio-capture') {
+          errorMsg = 'No microphone was found on your device.';
+        } else if (event.error === 'network') {
+          errorMsg = 'Network connection required for speech recognition.';
+        }
+
+        if (onError) onError(errorMsg);
+      };
+
+      this.recognition.onend = () => {
+        this.isListening = false;
+        if (this.silenceTimer) clearTimeout(this.silenceTimer);
+        if (onEnd) onEnd();
+      };
+
       this.recognition.start();
+      this.isListening = true;
       return true;
     } catch (e) {
       console.error('Failed to start speech recognition:', e);
+      this.isListening = false;
       if (onError) onError('Failed to access microphone. Please try again.');
       return false;
     }
@@ -130,12 +168,15 @@ class SpeechRecognitionService {
    * Stop listening session
    */
   stopListening() {
+    if (this.silenceTimer) {
+      clearTimeout(this.silenceTimer);
+      this.silenceTimer = null;
+    }
+
     if (this.recognition && this.isListening) {
       try {
         this.recognition.stop();
-      } catch (e) {
-        console.warn('Error stopping recognition:', e);
-      }
+      } catch (e) {}
       this.isListening = false;
     }
   }

@@ -6,7 +6,11 @@ class BankAccountService {
    */
   static async getAllAccountsSummary(userId) {
     try {
-      const accounts = await BankAccount.find({ userId }).sort({ createdAt: 1 }).lean();
+      const accounts = await BankAccount.find({ userId })
+        .sort({ createdAt: 1 })
+        .select('id name openingBalance createdAt updatedAt')
+        .lean();
+
       if (!accounts || accounts.length === 0) {
         return [];
       }
@@ -14,7 +18,8 @@ class BankAccountService {
       const accountIds = accounts.map(a => a.id);
 
       // Fast aggregation: sum income & expense grouped by accountId and type
-      const [txAgg, checks] = await Promise.all([
+      // And fetch only the latest check per account using aggregation pipeline
+      const [txAgg, latestChecks] = await Promise.all([
         Transaction.aggregate([
           {
             $match: {
@@ -29,9 +34,27 @@ class BankAccountService {
             }
           }
         ]),
-        AccountBalanceCheck.find({ userId, accountId: { $in: accountIds } })
-          .sort({ checkedAt: -1 })
-          .lean()
+        AccountBalanceCheck.aggregate([
+          {
+            $match: {
+              userId,
+              accountId: { $in: accountIds }
+            }
+          },
+          {
+            $sort: { checkedAt: -1 }
+          },
+          {
+            $group: {
+              _id: '$accountId',
+              id: { $first: '$id' },
+              expectedBalance: { $first: '$expectedBalance' },
+              actualBalance: { $first: '$actualBalance' },
+              difference: { $first: '$difference' },
+              checkedAt: { $first: '$checkedAt' }
+            }
+          }
+        ])
       ]);
 
       // Build quick lookup maps
@@ -47,10 +70,14 @@ class BankAccountService {
       });
 
       const lastCheckMap = {};
-      checks.forEach(chk => {
-        if (!lastCheckMap[chk.accountId]) {
-          lastCheckMap[chk.accountId] = chk;
-        }
+      latestChecks.forEach(chk => {
+        lastCheckMap[chk._id] = {
+          id: chk.id,
+          expectedBalance: chk.expectedBalance,
+          actualBalance: chk.actualBalance,
+          difference: chk.difference,
+          checkedAt: chk.checkedAt
+        };
       });
 
       return accounts.map(acc => {

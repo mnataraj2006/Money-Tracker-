@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Bell, Save, Calendar, Mic, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Bell, Save, Calendar, Mic, X, AlertTriangle } from 'lucide-react';
 import { transactionsAPI, bankAccountsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
+import { useLanguage } from '../context/LanguageContext';
+import { useRegisterModal } from '../context/NavigationContext';
 import VoiceEntryModal from '../components/VoiceEntryModal';
 import TransactionNameAutocomplete from '../components/TransactionNameAutocomplete';
 
 export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx }) {
   const { clearCache } = useDataCache();
+  const { t } = useLanguage();
+
   const [amount, setAmount] = useState(editTx ? editTx.amount : '');
   const [name, setName] = useState(editTx ? (editTx.transactionName || editTx.name || '') : '');
   const [paymentMethod, setPaymentMethod] = useState(editTx ? editTx.paymentMethod : 'CASH');
@@ -17,6 +21,16 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+
+  // Unsaved changes tracking
+  const [showConfirmDiscard, setShowConfirmDiscard] = useState(false);
+  const initialValuesRef = useRef({
+    name: editTx ? (editTx.transactionName || editTx.name || '').trim() : '',
+    amount: editTx ? String(editTx.amount || '').trim() : '',
+    note: editTx ? (editTx.description === 'string' ? '' : (editTx.description || '')).trim() : '',
+    paymentMethod: editTx ? editTx.paymentMethod : 'CASH',
+    accountId: editTx?.accountId && editTx.accountId !== 'CASH' ? editTx.accountId : ''
+  });
 
   // Quick add bank modal
   const [showAddBankModal, setShowAddBankModal] = useState(false);
@@ -37,6 +51,41 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx
       console.error('Failed to load bank accounts:', err);
     }
   };
+
+  const isFormDirty = () => {
+    const init = initialValuesRef.current;
+    if (!init) return false;
+    return (
+      name.trim() !== init.name ||
+      String(amount).trim() !== init.amount ||
+      note.trim() !== init.note ||
+      paymentMethod !== init.paymentMethod ||
+      accountId !== init.accountId
+    );
+  };
+
+  const handleDismiss = () => {
+    if (showConfirmDiscard) {
+      setShowConfirmDiscard(false);
+      return true;
+    }
+    if (showAddBankModal) {
+      setShowAddBankModal(false);
+      return true;
+    }
+    if (isVoiceModalOpen) {
+      setIsVoiceModalOpen(false);
+      return true;
+    }
+    if (isFormDirty()) {
+      setShowConfirmDiscard(true);
+      return true;
+    }
+    onBack();
+    return true;
+  };
+
+  useRegisterModal(true, handleDismiss);
 
   const handleQuickAddBank = async (e) => {
     e.preventDefault();
@@ -125,10 +174,10 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx
       {/* Header */}
       <div className="app-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="app-header-icon" onClick={onBack}>
+          <div className="app-header-icon" onClick={handleDismiss} style={{ cursor: 'pointer' }}>
             <ArrowLeft size={20} />
           </div>
-          <span className="app-title-text">Add Income</span>
+          <span className="app-title-text">{t('income')}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
@@ -139,172 +188,176 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx
               backgroundColor: '#021A1A',
               color: '#FFF',
               border: 'none',
-              fontSize: '12px',
-              fontWeight: '700',
               display: 'flex',
               alignItems: 'center',
-              gap: '4px',
+              gap: '6px',
+              fontSize: '13px',
+              fontWeight: '600',
               cursor: 'pointer'
             }}
           >
-            <Mic size={14} /> Voice
+            <Mic size={14} />
+            Voice
           </button>
-          <div className="app-header-icon">
-            <Bell size={18} />
-          </div>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        {error && (
-          <div style={{
-            padding: '12px',
-            backgroundColor: 'var(--badge-short-bg)',
-            color: 'var(--badge-short-text)',
-            borderRadius: '10px',
-            fontSize: '13px',
-            fontWeight: '600'
-          }}>
-            {error}
-          </div>
-        )}
+      <div className="main-content">
+        {error && <div className="error-banner">{error}</div>}
 
-        {/* Transaction Name Input with Autocomplete */}
-        <div className="input-group">
-          <label className="input-label">Transaction Name</label>
-          <TransactionNameAutocomplete
-            placeholder="e.g. Salary, Client Payment, சம்பளம்"
-            value={name}
-            onChange={(val) => setName(val)}
-            required
-            autoFocus
-          />
-        </div>
-
-        {/* Big Amount Input Card */}
-        <div className="stitch-card" style={{ padding: '20px', textAlign: 'center' }}>
-          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' }}>
-            Amount
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
-            <span style={{ fontSize: '28px', fontWeight: '800', color: 'var(--green-income)' }}>₹</span>
-            <input
-              type="number"
-              step="0.01"
-              placeholder="0.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              style={{
-                border: 'none',
-                outline: 'none',
-                fontSize: '34px',
-                fontWeight: '800',
-                color: 'var(--text-main)',
-                width: '180px',
-                textAlign: 'left'
-              }}
+        <form onSubmit={handleSubmit}>
+          {/* 1. Transaction Name */}
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label className="form-label">{t('transactionName')}</label>
+            <TransactionNameAutocomplete
+              value={name}
+              onChange={setName}
+              type="INCOME"
+              placeholder={t('transactionNamePlaceholder') || 'e.g. Salary, Shop Sales, Bonus'}
               required
             />
           </div>
-        </div>
 
-        {/* Transaction Name / Description Input */}
-        <div className="input-group">
-          <label className="input-label">Description / Note (Optional)</label>
-          <textarea
-            className="input-control"
-            placeholder="What was this for? (e.g. Salary, Freelance)"
-            rows={2}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-          />
-        </div>
-
-        {/* Payment Method Input */}
-        <div className="input-group">
-          <label className="input-label">Payment Method</label>
-          <select
-            className="input-control"
-            value={paymentMethod}
-            onChange={(e) => {
-              const val = e.target.value;
-              setPaymentMethod(val);
-              if (val === 'CASH') {
-                setAccountId('CASH');
-              } else if (val === 'UPI' && (!accountId || accountId === 'CASH')) {
-                if (bankAccounts.length > 0) {
-                  setAccountId(bankAccounts[0].id);
-                } else {
-                  setAccountId('');
-                }
-              }
-            }}
-          >
-            <option value="CASH">Cash (Modifies Cash at Home)</option>
-            <option value="UPI">UPI</option>
-          </select>
-
-          {/* Bank Account Selector for UPI */}
-          {paymentMethod === 'UPI' && (
-            <div style={{ marginTop: '10px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                <label className="input-label" style={{ margin: 0 }}>Bank Account *</label>
-                <button
-                  type="button"
-                  onClick={() => setShowAddBankModal(true)}
-                  style={{ background: 'none', border: 'none', color: 'var(--blue-navy)', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
-                >
-                  + Add Bank
-                </button>
-              </div>
-
-              <select
-                className="input-control"
-                value={accountId}
-                onChange={(e) => {
-                  if (e.target.value === '__ADD_NEW__') {
-                    setShowAddBankModal(true);
-                  } else {
-                    setAccountId(e.target.value);
-                  }
-                }}
-                required
-              >
-                <option value="" disabled>-- Select Bank Account --</option>
-                {bankAccounts.map((acc) => (
-                  <option key={acc.id} value={acc.id}>
-                    {acc.name} (₹{Math.round(acc.expectedBalance || 0).toLocaleString('en-IN')})
-                  </option>
-                ))}
-                <option value="__ADD_NEW__">+ Add Bank Account</option>
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Date Input */}
-        <div className="input-group">
-          <label className="input-label">Date</label>
-          <div className="input-field-wrapper">
+          {/* 2. Amount */}
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label className="form-label">{t('amount')} (₹)</label>
             <input
-              type="date"
-              className="input-control"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              type="number"
+              className="form-input"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              step="any"
+              required
             />
           </div>
-        </div>
 
-        <button type="submit" className="btn-primary-navy" disabled={loading} style={{ marginTop: '8px' }}>
-          <Save size={18} /> {loading ? 'Saving...' : 'Save Income'}
-        </button>
-      </form>
+          {/* 3. Description (Optional) */}
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label className="form-label">{t('descriptionOptional')}</label>
+            <input
+              type="text"
+              className="form-input"
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              placeholder={t('descriptionOptional')}
+            />
+          </div>
+
+          {/* 4. Payment Method */}
+          <div className="form-group" style={{ marginBottom: '16px' }}>
+            <label className="form-label">{t('paymentMethod')}</label>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('CASH')}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: `1.5px solid ${paymentMethod === 'CASH' ? '#16A34A' : '#CBD5E1'}`,
+                  background: paymentMethod === 'CASH' ? '#DCFCE7' : '#FFF',
+                  color: paymentMethod === 'CASH' ? '#16A34A' : '#64748B',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                💵 {t('cash')} ({t('cashAtHome') || 'Cash at Home'})
+              </button>
+              <button
+                type="button"
+                onClick={() => setPaymentMethod('UPI')}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  borderRadius: '8px',
+                  border: `1.5px solid ${paymentMethod === 'UPI' ? '#4338CA' : '#CBD5E1'}`,
+                  background: paymentMethod === 'UPI' ? '#EEF2FF' : '#FFF',
+                  color: paymentMethod === 'UPI' ? '#4338CA' : '#64748B',
+                  fontWeight: '700',
+                  fontSize: '13px',
+                  cursor: 'pointer'
+                }}
+              >
+                📱 {t('upi') || 'UPI'}
+              </button>
+            </div>
+
+            {/* Bank Account Selector when UPI is chosen */}
+            {paymentMethod === 'UPI' && (
+              <div style={{ marginTop: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label style={{ fontSize: '12px', fontWeight: '700', color: '#1E293B' }}>
+                    {t('selectBankAccount')} *
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddBankModal(true)}
+                    style={{ background: 'none', border: 'none', color: '#16247B', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    + {t('addBankAccount')}
+                  </button>
+                </div>
+                <select
+                  value={accountId}
+                  onChange={(e) => setAccountId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 12px',
+                    borderRadius: '8px',
+                    border: '1.5px solid #CBD5E1',
+                    background: '#FFF',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    color: accountId ? '#1E293B' : '#64748B',
+                    outline: 'none'
+                  }}
+                  required
+                >
+                  <option value="">-- {t('selectBankAccount')} --</option>
+                  {bankAccounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* 5. Date */}
+          <div className="form-group" style={{ marginBottom: '24px' }}>
+            <label className="form-label">{t('date')}</label>
+            <input
+              type="date"
+              className="form-input"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              required
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading}
+            style={{ width: '100%', backgroundColor: '#16A34A', borderColor: '#16A34A' }}
+          >
+            <Save size={18} />
+            {loading ? '...' : (editTx ? t('saveChanges') : t('saveIncome'))}
+          </button>
+        </form>
+      </div>
 
       <VoiceEntryModal
         isOpen={isVoiceModalOpen}
         onClose={() => setIsVoiceModalOpen(false)}
-        onSuccess={onSuccess}
         initialType="INCOME"
+        onSuccess={() => {
+          clearCache();
+          onSuccess();
+        }}
       />
 
       {/* Quick Add Bank Account Dialog */}
@@ -313,7 +366,7 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx
           <div className="confirm-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '90%' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' }}>
               <div style={{ fontSize: '17px', fontWeight: '800', color: '#1E293B' }}>
-                Add Bank Account
+                {t('addBankAccount')}
               </div>
               <button
                 type="button"
@@ -333,11 +386,11 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx
             <form onSubmit={handleQuickAddBank} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <div>
                 <label style={{ fontSize: '12px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>
-                  Bank Name *
+                  {t('bankName')} *
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. SBI, HDFC"
+                  placeholder={t('enterBankName')}
                   value={quickBankName}
                   onChange={(e) => setQuickBankName(e.target.value)}
                   style={{ width: '100%', padding: '10px 12px', fontSize: '14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', outline: 'none', background: '#FAFAFA' }}
@@ -348,7 +401,7 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx
 
               <div>
                 <label style={{ fontSize: '12px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>
-                  Opening Balance (₹)
+                  {t('openingBalance')} (₹)
                 </label>
                 <input
                   type="number"
@@ -367,17 +420,71 @@ export default function AddIncomeScreen({ onBack, onSuccess, initialDate, editTx
                   disabled={quickBankLoading}
                   style={{ flex: 1, padding: '10px', background: '#F1F5F9', color: '#334155', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
                 >
-                  Cancel
+                  {t('cancel')}
                 </button>
                 <button
                   type="submit"
                   disabled={quickBankLoading}
                   style={{ flex: 1, padding: '10px', background: '#16247B', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
                 >
-                  {quickBankLoading ? '...' : 'Save'}
+                  {quickBankLoading ? '...' : (t('save') || 'Save')}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Discard Confirmation Dialog */}
+      {showConfirmDiscard && (
+        <div className="confirm-backdrop" onClick={() => setShowConfirmDiscard(false)} style={{ zIndex: 100003 }}>
+          <div className="confirm-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px', width: '90%', textAlign: 'center' }}>
+            <AlertTriangle size={40} color="#DC2626" style={{ margin: '0 auto 10px' }} />
+            <div style={{ fontSize: '18px', fontWeight: '800', color: '#1E293B', marginBottom: '6px' }}>
+              {t('discardTransaction')}
+            </div>
+            <div style={{ fontSize: '14px', color: '#64748B', marginBottom: '18px', lineHeight: '1.4' }}>
+              {t('unsavedChangesMessage')}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setShowConfirmDiscard(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: '#F1F5F9',
+                  color: '#334155',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmDiscard(false);
+                  onBack();
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: '#DC2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                {t('discard')}
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -225,7 +225,7 @@ router.get('/daily-details', authenticateToken, async (req, res) => {
       CashCalculationService.getExpectedCash(userId, targetDate),
       Transaction.find({ userId, date: targetDate })
         .sort({ createdAt: -1 })
-        .select('id type amount name transactionName category paymentMethod description date createdAt')
+        .select('id type amount name transactionName category paymentMethod accountId description date createdAt')
         .lean(),
       CashCount.findOne({ userId, date: targetDate }).sort({ createdAt: -1 }).lean(),
       DailyClosing.findOne({ userId, date: targetDate }).lean()

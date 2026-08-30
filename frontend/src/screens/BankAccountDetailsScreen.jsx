@@ -1,22 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Landmark, Plus, Edit2, Trash2, CheckCircle2, AlertTriangle, ShieldCheck, AlertCircle, RefreshCw, X, Check } from 'lucide-react';
+import { ArrowLeft, Edit2, Trash2, AlertTriangle, X } from 'lucide-react';
 import PageContainer from '../components/PageContainer';
-import { bankAccountsAPI, transactionsAPI } from '../services/api';
+import { bankAccountsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import { useDataCache } from '../context/DataContext';
+import { useRegisterModal } from '../context/NavigationContext';
 import SimpleTransactionSheet from '../components/SimpleTransactionSheet';
 
 export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate }) {
   const { t } = useLanguage();
+  const { clearCache } = useDataCache();
   const [account, setAccount] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
-  // Verification modal state
-  const [isVerifyModalOpen, setIsVerifyModalOpen] = useState(false);
-  const [actualBalanceInput, setActualBalanceInput] = useState('');
-  const [verifyResult, setVerifyResult] = useState(null);
-  const [verifyLoading, setVerifyLoading] = useState(false);
-  const [verifyError, setVerifyError] = useState('');
 
   // Edit / Rename modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -30,9 +26,20 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
-  // Transaction Sheet for editing a transaction
+  // Transaction Sheet for viewing/editing a transaction
   const [selectedTx, setSelectedTx] = useState(null);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
+
+  // Register modal handlers with back button manager
+  useRegisterModal(isEditModalOpen, () => {
+    setIsEditModalOpen(false);
+    return true;
+  });
+
+  useRegisterModal(isDeleteModalOpen, () => {
+    setIsDeleteModalOpen(false);
+    return true;
+  });
 
   useEffect(() => {
     if (accountId) {
@@ -58,27 +65,6 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
     }
   };
 
-  const handleVerifySubmit = async (e) => {
-    e.preventDefault();
-    setVerifyError('');
-    const num = parseFloat(actualBalanceInput);
-    if (actualBalanceInput === '' || isNaN(num)) {
-      setVerifyError('Please enter a valid actual balance amount');
-      return;
-    }
-
-    try {
-      setVerifyLoading(true);
-      const res = await bankAccountsAPI.verifyBalance(accountId, num);
-      setVerifyResult(res);
-      await loadAccountData();
-    } catch (err) {
-      setVerifyError(err.message || 'Failed to verify balance');
-    } finally {
-      setVerifyLoading(false);
-    }
-  };
-
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     setEditError('');
@@ -100,6 +86,7 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
         openingBalance: numOpening
       });
       setIsEditModalOpen(false);
+      clearCache();
       await loadAccountData();
     } catch (err) {
       setEditError(err.message || 'Failed to update bank account');
@@ -114,6 +101,7 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
       setDeleteLoading(true);
       await bankAccountsAPI.delete(accountId);
       setIsDeleteModalOpen(false);
+      clearCache();
       onBack();
     } catch (err) {
       setDeleteError(err.message || 'Failed to delete bank account');
@@ -150,19 +138,14 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
     );
   }
 
-  const lastCheck = account.lastCheck;
-  const diff = lastCheck ? lastCheck.difference : 0;
-  const checkDateStr = lastCheck && lastCheck.checkedAt
-    ? new Date(lastCheck.checkedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })
-    : null;
-
   return (
     <PageContainer>
-      {/* 1. Header with back and edit actions */}
+      {/* 1. Header with back, account name, and edit/delete actions */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <button
             onClick={onBack}
+            aria-label="Go Back"
             style={{
               background: '#F1F5F9',
               border: 'none',
@@ -235,7 +218,7 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
         </div>
       </div>
 
-      {/* 2. Expected Balance Card */}
+      {/* 2. Simplified Expected Balance Card */}
       <div
         className="navy-card"
         style={{
@@ -244,7 +227,7 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
           flexDirection: 'column',
           alignItems: 'center',
           textAlign: 'center',
-          gap: '8px',
+          gap: '6px',
           background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
           color: '#FFFFFF',
           borderRadius: '18px',
@@ -258,82 +241,9 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
         <div style={{ fontSize: '36px', fontWeight: '800', letterSpacing: '-0.5px' }}>
           {formatCurrency(account.expectedBalance)}
         </div>
-
-        {/* Verification status badge */}
-        <div style={{ marginTop: '4px' }}>
-          {lastCheck ? (
-            diff === 0 ? (
-              <span style={{
-                background: 'rgba(22, 163, 74, 0.25)',
-                color: '#86EFAC',
-                padding: '4px 12px',
-                borderRadius: '20px',
-                fontSize: '12px',
-                fontWeight: '700',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                <ShieldCheck size={14} /> {t('lastChecked')}: {checkDateStr} (✓ {t('balanceMatches')})
-              </span>
-            ) : (
-              <span style={{
-                background: 'rgba(220, 38, 38, 0.25)',
-                color: '#FCA5A5',
-                padding: '4px 12px',
-                borderRadius: '20px',
-                fontSize: '12px',
-                fontWeight: '700',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '4px'
-              }}>
-                <AlertCircle size={14} /> {t('lastChecked')}: {checkDateStr} ({diff > 0 ? `+₹${diff}` : `-₹${Math.abs(diff)}`} {t('difference')})
-              </span>
-            )
-          ) : (
-            <span style={{
-              background: 'rgba(255, 255, 255, 0.15)',
-              color: '#CBD5E1',
-              padding: '4px 12px',
-              borderRadius: '20px',
-              fontSize: '12px',
-              fontWeight: '600'
-            }}>
-              {t('notCheckedYet')}
-            </span>
-          )}
-        </div>
-
-        {/* Verify Balance Action Button */}
-        <button
-          onClick={() => {
-            setVerifyError('');
-            setVerifyResult(null);
-            setActualBalanceInput(lastCheck ? String(lastCheck.actualBalance) : '');
-            setIsVerifyModalOpen(true);
-          }}
-          style={{
-            marginTop: '12px',
-            background: '#FFFFFF',
-            color: '#0F172A',
-            border: 'none',
-            borderRadius: '12px',
-            padding: '12px 24px',
-            fontSize: '15px',
-            fontWeight: '800',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-          }}
-        >
-          <ShieldCheck size={18} color="#16A34A" /> {t('verifyBalance')}
-        </button>
       </div>
 
-      {/* 3. Account Financial Summary Cards */}
+      {/* 3. Account Financial Summary Cards (Income / Expense / Opening Balance) */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '20px' }}>
         {/* Income */}
         <div className="stitch-card" style={{ padding: '12px', textAlign: 'center' }}>
@@ -419,114 +329,7 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
         )}
       </div>
 
-      {/* 5. VERIFY BALANCE MODAL */}
-      {isVerifyModalOpen && (
-        <div className="sheet-backdrop" onClick={() => setIsVerifyModalOpen(false)} style={{ zIndex: 100000 }}>
-          <div className="sheet-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #E2E8F0' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#1E293B', margin: 0 }}>
-                {t('verifyBalance')} — {account.name}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsVerifyModalOpen(false)}
-                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            {verifyError && (
-              <div style={{ background: '#FEE2E2', color: '#DC2626', padding: '10px 14px', borderRadius: '8px', marginBottom: '14px', fontSize: '13px', fontWeight: '600' }}>
-                {verifyError}
-              </div>
-            )}
-
-            {/* Expected Balance Info Box */}
-            <div style={{ background: '#F8FAFC', border: '1.5px solid #E2E8F0', borderRadius: '12px', padding: '14px', textAlign: 'center', marginBottom: '16px' }}>
-              <div style={{ fontSize: '12px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase' }}>
-                {t('expectedBalance')} (Cashly)
-              </div>
-              <div style={{ fontSize: '26px', fontWeight: '800', color: '#1E293B', marginTop: '4px' }}>
-                {formatCurrency(account.expectedBalance)}
-              </div>
-            </div>
-
-            <form onSubmit={handleVerifySubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px', display: 'block' }}>
-                  {t('actualBalance')} (₹)
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  placeholder={t('enterActualBalance') || 'Enter actual balance from bank/passbook'}
-                  value={actualBalanceInput}
-                  onChange={(e) => {
-                    setActualBalanceInput(e.target.value);
-                    setVerifyResult(null);
-                  }}
-                  style={{
-                    width: '100%',
-                    padding: '14px',
-                    fontSize: '18px',
-                    fontWeight: '800',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
-                    outline: 'none',
-                    background: '#FAFAFA'
-                  }}
-                  required
-                  autoFocus
-                />
-              </div>
-
-              {/* Verification Comparison Result */}
-              {verifyResult && (
-                <div style={{
-                  padding: '14px',
-                  borderRadius: '12px',
-                  background: verifyResult.matches ? '#DCFCE7' : '#FEE2E2',
-                  border: `1.5px solid ${verifyResult.matches ? '#86EFAC' : '#FECDD3'}`,
-                  color: verifyResult.matches ? '#15803D' : '#B91C1C'
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '15px', fontWeight: '800' }}>
-                    {verifyResult.matches ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-                    {verifyResult.matches ? t('balanceMatches') : (
-                      verifyResult.difference < 0
-                        ? `₹${Math.abs(verifyResult.difference)} ${t('lessThanExpected')}`
-                        : `₹${verifyResult.difference} ${t('moreThanExpected')}`
-                    )}
-                  </div>
-                  <div style={{ fontSize: '12px', marginTop: '6px', fontWeight: '600', opacity: 0.9 }}>
-                    Expected: {formatCurrency(verifyResult.expectedBalance)} | Actual: {formatCurrency(verifyResult.actualBalance)} | Diff: {verifyResult.difference >= 0 ? `+₹${verifyResult.difference}` : `-₹${Math.abs(verifyResult.difference)}`}
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="submit"
-                disabled={verifyLoading}
-                className="btn-primary-navy"
-                style={{ padding: '14px', marginTop: '6px' }}
-              >
-                {verifyLoading ? 'Verifying...' : t('verifyBalance')}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsVerifyModalOpen(false)}
-                disabled={verifyLoading}
-                style={{ background: 'transparent', border: 'none', color: '#64748B', fontSize: '14px', fontWeight: '700', padding: '6px', cursor: 'pointer' }}
-              >
-                {t('cancel')}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* 6. EDIT / RENAME BANK ACCOUNT MODAL */}
+      {/* 5. EDIT / RENAME BANK ACCOUNT MODAL */}
       {isEditModalOpen && (
         <div className="sheet-backdrop" onClick={() => setIsEditModalOpen(false)} style={{ zIndex: 100000 }}>
           <div className="sheet-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
@@ -592,7 +395,7 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
         </div>
       )}
 
-      {/* 7. DELETE BANK ACCOUNT CONFIRMATION MODAL */}
+      {/* 6. DELETE BANK ACCOUNT CONFIRMATION MODAL */}
       {isDeleteModalOpen && (
         <div className="sheet-backdrop" onClick={() => setIsDeleteModalOpen(false)} style={{ zIndex: 100000 }}>
           <div className="sheet-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '420px' }}>
@@ -634,7 +437,7 @@ export default function BankAccountDetailsScreen({ accountId, onBack, onNavigate
         </div>
       )}
 
-      {/* 8. Edit Transaction Modal */}
+      {/* 7. Edit Transaction Modal */}
       {isSheetOpen && selectedTx && (
         <SimpleTransactionSheet
           isOpen={isSheetOpen}

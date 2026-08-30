@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Mic, Settings } from 'lucide-react';
-import { summaryAPI, transactionsAPI } from '../services/api';
+import { summaryAPI, transactionsAPI, bankAccountsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import SimpleTransactionSheet from '../components/SimpleTransactionSheet';
 import VoiceEntryModal from '../components/VoiceEntryModal';
+import TodayTransactionsSheet from '../components/TodayTransactionsSheet';
 import '../styles/SimplePassbookView.css';
 
 export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
@@ -13,6 +14,7 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
   const [error, setError] = useState(null);
 
   const [transactions, setTransactions] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [totalIncome, setTotalIncome] = useState(0);
   const [totalExpense, setTotalExpense] = useState(0);
   const [currentBalance, setCurrentBalance] = useState(0);
@@ -20,6 +22,10 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
   // Bottom Sheet State
   const [sheetOpen, setSheetOpen] = useState(false);
   const [selectedTx, setSelectedTx] = useState(null);
+
+  // Today's Income / Expense Details Sheet State
+  const [detailsSheetOpen, setDetailsSheetOpen] = useState(false);
+  const [detailsSheetType, setDetailsSheetType] = useState('INCOME');
 
   // Voice State
   const [showVoiceModal, setShowVoiceModal] = useState(false);
@@ -35,10 +41,14 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
     try {
       setLoading(true);
       setError(null);
-      const data = await summaryAPI.getDailyDetails(currentDate);
+      const [data, bankRes] = await Promise.all([
+        summaryAPI.getDailyDetails(currentDate),
+        bankAccountsAPI.getAll().catch(() => ({ bankAccounts: [] }))
+      ]);
       
       const txs = data.transactions || [];
       setTransactions(txs);
+      setBankAccounts(bankRes.bankAccounts || []);
 
       const inc = txs.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
       const exp = txs.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + (parseFloat(t.amount) || 0), 0);
@@ -197,7 +207,14 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
           <>
             {/* Income Section */}
             <div className="passbook-section">
-              <div className="passbook-section-header income">
+              <div
+                className="passbook-section-header income"
+                onClick={() => {
+                  setDetailsSheetType('INCOME');
+                  setDetailsSheetOpen(true);
+                }}
+                style={{ cursor: 'pointer' }}
+              >
                 <span className="passbook-section-title income">{t('income')}</span>
                 <span className="passbook-section-total income">
                   {t('totalIncome')} {formatCurrency(totalIncome)}
@@ -235,7 +252,14 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
 
             {/* Expense Section */}
             <div className="passbook-section">
-              <div className="passbook-section-header expense">
+              <div
+                className="passbook-section-header expense"
+                onClick={() => {
+                  setDetailsSheetType('EXPENSE');
+                  setDetailsSheetOpen(true);
+                }}
+                style={{ cursor: 'pointer' }}
+              >
                 <span className="passbook-section-title expense">{t('expense')}</span>
                 <span className="passbook-section-total expense">
                   {t('totalExpense')} {formatCurrency(totalExpense)}
@@ -314,6 +338,20 @@ export default function SimplePassbookView({ user, onSwitchMode, onNavigate }) {
           initialDate={currentDate}
         />
       )}
+
+      {/* Today's Income / Expense Details Bottom Sheet */}
+      <TodayTransactionsSheet
+        isOpen={detailsSheetOpen}
+        onClose={() => setDetailsSheetOpen(false)}
+        type={detailsSheetType}
+        totalAmount={detailsSheetType === 'INCOME' ? totalIncome : totalExpense}
+        transactions={transactions}
+        bankAccounts={bankAccounts}
+        onSelectTransaction={(tx) => {
+          setDetailsSheetOpen(false);
+          handleOpenEditSheet(tx);
+        }}
+      />
     </div>
   );
 }

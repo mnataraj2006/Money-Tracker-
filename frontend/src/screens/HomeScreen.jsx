@@ -7,6 +7,7 @@ import { useDataCache } from '../context/DataContext';
 import PageContainer from '../components/PageContainer';
 import VoiceEntryModal from '../components/VoiceEntryModal';
 import SimpleTransactionSheet from '../components/SimpleTransactionSheet';
+import TodayTransactionsSheet from '../components/TodayTransactionsSheet';
 
 export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
   const { t, language } = useLanguage();
@@ -16,6 +17,10 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
   const [loading, setLoading] = useState(!cache.dashboard);
   const [error, setError] = useState(false);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+
+  // Today's Income / Expense Details Sheet State
+  const [detailsSheetOpen, setDetailsSheetOpen] = useState(false);
+  const [detailsSheetType, setDetailsSheetType] = useState('INCOME');
 
   // Simple Passbook Entry Sheet State
   const [isSimpleSheetOpen, setIsSimpleSheetOpen] = useState(false);
@@ -231,8 +236,23 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-          {/* Income Card */}
-          <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '6px' }}>
+          {/* Income Card (Clickable to view today's income transactions) */}
+          <div
+            className="stitch-card"
+            onClick={() => {
+              setDetailsSheetType('INCOME');
+              setDetailsSheetOpen(true);
+            }}
+            style={{
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--green-income)', fontWeight: '700', textTransform: 'uppercase' }}>
               <ArrowDown size={14} /> {t('income')}
             </div>
@@ -241,8 +261,23 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
             </div>
           </div>
 
-          {/* Expense Card */}
-          <div className="stitch-card" style={{ padding: '16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: '6px' }}>
+          {/* Expense Card (Clickable to view today's expense transactions) */}
+          <div
+            className="stitch-card"
+            onClick={() => {
+              setDetailsSheetType('EXPENSE');
+              setDetailsSheetOpen(true);
+            }}
+            style={{
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              gap: '6px',
+              cursor: 'pointer',
+              userSelect: 'none'
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'var(--red-expense)', fontWeight: '700', textTransform: 'uppercase' }}>
               <ArrowUp size={14} /> {t('expense')}
             </div>
@@ -375,7 +410,7 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
 
             <button
               className="btn-primary-navy"
-              onClick={() => onNavigate('cash')}
+              onClick={() => onNavigate('count-cash')}
               style={{
                 height: '52px',
                 borderRadius: '12px',
@@ -721,6 +756,20 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
         initialDate={new Date().toISOString().split('T')[0]}
         editTx={selectedEditTx}
         presetType={simplePresetType}
+      />
+
+      {/* Today's Income / Expense Details Bottom Sheet */}
+      <TodayTransactionsSheet
+        isOpen={detailsSheetOpen}
+        onClose={() => setDetailsSheetOpen(false)}
+        type={detailsSheetType}
+        totalAmount={detailsSheetType === 'INCOME' ? data?.todayIncome : data?.todayExpense}
+        transactions={data?.recentTransactions || []}
+        bankAccounts={data?.bankAccounts || []}
+        onSelectTransaction={(tx) => {
+          setDetailsSheetOpen(false);
+          handleOpenEditTx(tx);
+        }}
       />
     </PageContainer>
   );

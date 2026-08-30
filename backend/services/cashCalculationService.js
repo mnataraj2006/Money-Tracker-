@@ -9,28 +9,38 @@ class CashCalculationService {
    */
   static async getPreviousClosingCash(userId, targetDate) {
     try {
-      const prevClosing = await DailyClosing.findOne({
-        userId,
-        date: { $lt: targetDate },
-        isClosed: true
-      })
-        .sort({ date: -1 })
-        .select('physicalCash expectedClosingCash')
-        .lean();
+      const [prevClosing, latestCount] = await Promise.all([
+        DailyClosing.findOne({
+          userId,
+          date: { $lt: targetDate },
+          isClosed: true
+        })
+          .sort({ date: -1 })
+          .select('date physicalCash expectedClosingCash')
+          .lean(),
+        CashCount.findOne({
+          userId,
+          date: { $lt: targetDate }
+        })
+          .sort({ date: -1, createdAt: -1 })
+          .select('date physicalCash')
+          .lean()
+      ]);
+
+      if (prevClosing && latestCount) {
+        if (latestCount.date > prevClosing.date) {
+          return latestCount.physicalCash;
+        }
+        return prevClosing.physicalCash !== undefined && prevClosing.physicalCash !== null
+          ? prevClosing.physicalCash
+          : prevClosing.expectedClosingCash;
+      }
 
       if (prevClosing) {
         return prevClosing.physicalCash !== undefined && prevClosing.physicalCash !== null
           ? prevClosing.physicalCash
           : prevClosing.expectedClosingCash;
       }
-
-      const latestCount = await CashCount.findOne({
-        userId,
-        date: { $lt: targetDate }
-      })
-        .sort({ date: -1, createdAt: -1 })
-        .select('physicalCash')
-        .lean();
 
       if (latestCount) return latestCount.physicalCash;
 

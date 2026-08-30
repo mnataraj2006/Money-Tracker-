@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Edit, Trash2, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard } from 'lucide-react';
 import { transactionsAPI, bankAccountsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
+import { useLanguage } from '../context/LanguageContext';
 
 export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
   const { clearCache } = useDataCache();
+  const { t } = useLanguage();
   const [tx, setTx] = useState(null);
   const [bankName, setBankName] = useState('');
   const [loading, setLoading] = useState(true);
@@ -17,6 +19,7 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
   const loadTransaction = async () => {
     try {
       setLoading(true);
+      setError('');
       const data = await transactionsAPI.getById(txId);
       const loadedTx = data.transaction;
       setTx(loadedTx);
@@ -27,7 +30,7 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           if (bankData?.bankAccount?.name) {
             setBankName(bankData.bankAccount.name);
           }
-        } catch (err) {
+        } catch {
           // ignore if bank not found
         }
       }
@@ -39,7 +42,7 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Are you sure you want to delete this transaction?')) return;
+    if (!window.confirm(t('confirmDeleteTx') || 'Are you sure you want to delete this transaction?')) return;
     try {
       await transactionsAPI.delete(txId);
       clearCache();
@@ -63,7 +66,7 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
   if (loading) {
     return (
       <div className="screen-container" style={{ justifyContent: 'center', textAlign: 'center' }}>
-        Loading details...
+        {t('loading') || 'Loading details...'}
       </div>
     );
   }
@@ -71,21 +74,26 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
   if (!tx) {
     return (
       <div className="screen-container" style={{ textAlign: 'center', padding: '40px 0' }}>
-        Transaction not found.
-        <button className="btn-primary-navy" onClick={onBack} style={{ marginTop: '16px' }}>Back</button>
+        {error || 'Transaction not found.'}
+        <button className="btn-primary-navy" onClick={onBack} style={{ marginTop: '16px' }}>
+          {t('back') || 'Back'}
+        </button>
       </div>
     );
   }
+
+  const txTitle = tx.transactionName || tx.name || t('unnamedTransaction');
+  const hasDescription = tx.description && typeof tx.description === 'string' && tx.description.trim() !== '' && tx.description !== 'string';
 
   return (
     <div className="screen-container">
       {/* Header */}
       <div className="app-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="app-header-icon" onClick={onBack}>
+          <div className="app-header-icon" onClick={onBack} style={{ cursor: 'pointer' }}>
             <ArrowLeft size={20} />
           </div>
-          <span className="app-title-text">Transaction Details</span>
+          <span className="app-title-text">{t('transactionDetails')}</span>
         </div>
       </div>
 
@@ -103,8 +111,8 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           {getCategoryIcon(tx.category, tx.type)}
         </div>
 
-        <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)', textAlign: 'center' }}>
-          {tx.transactionName || tx.name || 'Unnamed Transaction'}
+        <div style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)', textAlign: 'center', wordBreak: 'break-word' }}>
+          {txTitle}
         </div>
 
         <div style={{
@@ -123,40 +131,73 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           fontSize: '12px',
           fontWeight: '700'
         }}>
-          {tx.date} • {tx.paymentMethod} {bankName ? `• ${bankName}` : ''}
+          {tx.date} • {tx.paymentMethod === 'CASH' ? t('cash') : 'UPI'} {bankName ? `• ${bankName}` : ''}
         </div>
       </div>
 
       {/* Metadata Rows Card */}
       <div className="stitch-card" style={{ padding: '8px 16px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Transaction Name</span>
-          <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>
-            {tx.transactionName || tx.name || '—'}
+        {/* 1. Transaction Name */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)', gap: '12px' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600', flexShrink: 0 }}>
+            {t('transactionName')}
+          </span>
+          <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700', textAlign: 'right', wordBreak: 'break-word' }}>
+            {txTitle}
           </span>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Payment Method</span>
-          <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>{tx.paymentMethod}</span>
-        </div>
-
-        {bankName && (
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
-            <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Bank Account</span>
-            <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>{bankName}</span>
+        {/* 2. Description (Shown only when present) */}
+        {hasDescription && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)', gap: '12px' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600', flexShrink: 0 }}>
+              {t('description')}
+            </span>
+            <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700', textAlign: 'right', wordBreak: 'break-word' }}>
+              {tx.description.trim()}
+            </span>
           </div>
         )}
 
+        {/* 3. Payment Method */}
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Date</span>
-          <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>{tx.date}</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+            {t('paymentMethod')}
+          </span>
+          <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>
+            {tx.paymentMethod === 'CASH' ? t('cash') : 'UPI'}
+          </span>
         </div>
 
+        {/* 4. Bank Account (If UPI) */}
+        {bankName && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+              {t('bankAccount')}
+            </span>
+            <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>
+              {bankName}
+            </span>
+          </div>
+        )}
+
+        {/* 5. Date */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+            {t('date')}
+          </span>
+          <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>
+            {tx.date}
+          </span>
+        </div>
+
+        {/* 6. Type */}
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0' }}>
-          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Type</span>
+          <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>
+            {t('type')}
+          </span>
           <span style={{ color: tx.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)', fontSize: '13px', fontWeight: '700' }}>
-            {tx.type}
+            {tx.type === 'INCOME' ? t('income') : t('expense')}
           </span>
         </div>
       </div>
@@ -167,11 +208,11 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           className="btn-primary-navy"
           onClick={() => onNavigate(tx.type === 'INCOME' ? 'add-income' : 'add-expense', { editTx: tx })}
         >
-          <Edit size={18} /> Edit Transaction
+          <Edit size={18} /> {t('editTransaction')}
         </button>
 
         <button className="btn-outline-red" onClick={handleDelete}>
-          <Trash2 size={18} /> Delete
+          <Trash2 size={18} /> {t('delete')}
         </button>
       </div>
     </div>

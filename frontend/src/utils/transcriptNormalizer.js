@@ -93,12 +93,14 @@ export const PAYMENT_METHOD_MAP = {
 
 export const EXPENSE_KEYWORDS = [
   'செலவு', 'செலவானது', 'செலவு செய்தேன்', 'செலவு பண்ணினேன்', 'வாங்கினேன்', 'வாங்குனேன்',
-  'கொடுத்தேன்', 'கொடுத்து', 'வாங்கி', 'பணம் செலவானது', 'selavu', 'spent', 'paid', 'bought', 'expense', 'purchase'
+  'கொடுத்தேன்', 'கொடுத்து', 'வாங்கி', 'பணம் செலவானது', 'செலுத்தினேன்', 'செலுத்தியது', 'கட்டினேன்', 'கட்டணம்',
+  'selavu', 'spent', 'paid', 'bought', 'expense', 'purchase'
 ];
 
 export const INCOME_KEYWORDS = [
   'வரவு', 'வருமானம்', 'வந்தது', 'வந்துச்சு', 'கிடைத்தது', 'கிடைச்சது', 'பெற்றேன்', 'சம்பளம்',
-  'சம்பளமாக வந்தது', 'received', 'got', 'earned', 'salary', 'income', 'credited', 'deposit'
+  'சம்பளமாக', 'சம்பளமாக வந்தது', 'கூலி', 'கொடுத்தார்', 'கொடுத்தாங்க', 'அனுப்பினார்', 'அனுப்புனாங்க', 'பணம் வந்தது',
+  'received', 'got', 'earned', 'salary', 'income', 'credited', 'deposit'
 ];
 
 /**

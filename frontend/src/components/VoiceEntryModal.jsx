@@ -1,14 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, RefreshCw, X, Check, ArrowRight, Calendar, AlertCircle } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Mic, RefreshCw, X, Save, Plus, AlertCircle, Volume2 } from 'lucide-react';
 import { speechService } from '../services/speechRecognitionService';
 import { parseTransactionFromSpeech } from '../utils/transactionParser';
-import { transactionsAPI } from '../services/api';
+import { transactionsAPI, bankAccountsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useRegisterModal } from '../context/NavigationContext';
+import TransactionNameAutocomplete from './TransactionNameAutocomplete';
 
 export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialType = null }) {
   const { clearCache } = useDataCache();
   const { t, language } = useLanguage();
+
+  // Register with modal back stack
+  useRegisterModal(isOpen, () => {
+    onClose();
+    return true;
+  });
 
   const [step, setStep] = useState('listening'); // 'listening', 'review'
   const [transcript, setTranscript] = useState('');
@@ -19,31 +28,46 @@ export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialTyp
   const [type, setType] = useState(initialType || 'EXPENSE');
   const [amount, setAmount] = useState('');
   const [name, setName] = useState('');
-  const [category, setCategory] = useState('Groceries');
-  const [paymentMethod, setPaymentMethod] = useState(''); // Empty if ambiguous
+  const [paymentMethod, setPaymentMethod] = useState('CASH');
+  const [accountId, setAccountId] = useState('');
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState('');
   const [saveLoading, setSaveLoading] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  // Voice language preference from localStorage or default 'ta'
-  const [voiceLang, setVoiceLang] = useState(() => localStorage.getItem('cashly_voice_lang') || 'ta');
+  // Quick Add Bank Account modal state inside voice entry
+  const [showAddBankModal, setShowAddBankModal] = useState(false);
+  const [quickBankName, setQuickBankName] = useState('');
+  const [quickOpeningBalance, setQuickOpeningBalance] = useState('');
+  const [quickBankLoading, setQuickBankLoading] = useState(false);
+  const [quickBankError, setQuickBankError] = useState('');
+
+  // Voice speech language preference (defaulting to current language)
+  const [voiceLang, setVoiceLang] = useState(() => {
+    return localStorage.getItem('cashly_voice_lang') || (language === 'en' ? 'en-IN' : 'ta-IN');
+  });
 
   const latestTextRef = useRef('');
 
-  const categories = [
-    'Groceries', 'Petrol', 'Food', 'Bills', 'Salary', 'Medical',
-    'Shopping', 'Transport', 'Rent', 'Peanut Candy', 'General'
-  ];
-
   useEffect(() => {
     if (isOpen) {
+      loadBankAccounts();
       startVoiceRecognition();
     } else {
       speechService.stopListening();
       resetState();
     }
   }, [isOpen]);
+
+  const loadBankAccounts = async () => {
+    try {
+      const res = await bankAccountsAPI.getAll();
+      setBankAccounts(res.bankAccounts || []);
+    } catch (err) {
+      console.error('Failed to load bank accounts for voice modal:', err);
+    }
+  };
 
   const resetState = () => {
     setStep('listening');
@@ -53,22 +77,26 @@ export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialTyp
     setVoiceError('');
     setType(initialType || 'EXPENSE');
     setAmount('');
-    setCategory('Groceries');
-    setPaymentMethod('');
+    setName('');
+    setPaymentMethod('CASH');
+    setAccountId('');
     setDate(new Date().toISOString().split('T')[0]);
     setDescription('');
     setSaveLoading(false);
     setSaveError('');
+    setShowAddBankModal(false);
   };
 
-  const startVoiceRecognition = () => {
+  const startVoiceRecognition = async (overrideLang = null) => {
     setVoiceError('');
     setTranscript('');
     latestTextRef.current = '';
     setStep('listening');
 
-    const success = speechService.startListening({
-      language: voiceLang,
+    const targetLang = overrideLang || voiceLang;
+
+    const success = await speechService.startListening({
+      language: targetLang,
       onResult: (text, isFinal) => {
         latestTextRef.current = text;
         setTranscript(text);
@@ -79,7 +107,6 @@ export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialTyp
       },
       onEnd: () => {
         setIsListening(false);
-        // Automatically transition to detail filling / review step if transcript exists
         if (latestTextRef.current && latestTextRef.current.trim()) {
           processTranscript(latestTextRef.current);
         }
@@ -96,7 +123,7 @@ export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialTyp
     if (textToProcess && textToProcess.trim()) {
       processTranscript(textToProcess);
     } else {
-      setVoiceError(t('couldNotUnderstand') || 'No speech was detected. Please try again.');
+      setVoiceError(t('couldNotUnderstand') || 'Could not understand speech. Please try again.');
     }
   };
 
@@ -107,19 +134,76 @@ export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialTyp
     const parsed = parseTransactionFromSpeech(text);
 
     // Apply parsed values
-    if (parsed.type) setType(parsed.type);
-    else if (initialType) setType(initialType);
+    if (parsed.type) {
+      setType(parsed.type);
+    } else if (initialType) {
+      setType(initialType);
+    }
 
-    if (parsed.amount) setAmount(parsed.amount.toString());
-    if (parsed.category) setCategory(parsed.category);
-    if (parsed.paymentMethod) setPaymentMethod(parsed.paymentMethod);
-    if (parsed.date) setDate(parsed.date);
-    if (parsed.description) setDescription(parsed.description);
-    if (parsed.name) setName(parsed.name);
-    else if (parsed.description && parsed.description !== parsed.category) setName(parsed.description);
-    else setName('');
+    if (parsed.amount) {
+      setAmount(parsed.amount.toString());
+    } else {
+      setAmount('');
+    }
+
+    if (parsed.transactionName) {
+      setName(parsed.transactionName);
+    } else {
+      setName('');
+    }
+
+    if (parsed.paymentMethod) {
+      setPaymentMethod(parsed.paymentMethod);
+    } else {
+      setPaymentMethod('CASH');
+    }
+
+    if (parsed.date) {
+      setDate(parsed.date);
+    }
+
+    if (parsed.description) {
+      setDescription(parsed.description);
+    } else {
+      setDescription('');
+    }
 
     setStep('review');
+  };
+
+  const handleQuickAddBank = async (e) => {
+    e.preventDefault();
+    setQuickBankError('');
+    const clean = quickBankName.trim();
+    if (!clean) {
+      setQuickBankError('Bank name is required');
+      return;
+    }
+    const numOpening = parseFloat(quickOpeningBalance || '0');
+    if (isNaN(numOpening)) {
+      setQuickBankError('Opening balance must be a number');
+      return;
+    }
+
+    try {
+      setQuickBankLoading(true);
+      const res = await bankAccountsAPI.create({
+        name: clean,
+        openingBalance: numOpening
+      });
+      const created = res.bankAccount;
+      if (created) {
+        setBankAccounts(prev => [...prev, created]);
+        setAccountId(created.id);
+      }
+      setQuickBankName('');
+      setQuickOpeningBalance('');
+      setShowAddBankModal(false);
+    } catch (err) {
+      setQuickBankError(err.message || 'Failed to create bank account');
+    } finally {
+      setQuickBankLoading(false);
+    }
   };
 
   const handleSaveTransaction = async (e) => {
@@ -132,8 +216,13 @@ export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialTyp
       return;
     }
 
-    if (!paymentMethod) {
-      setSaveError(language === 'ta' ? 'தயவுசெய்து செலுத்தும் முறையைத் தேர்ந்தெடுக்கவும் (Cash, UPI, Bank, Card)' : 'Please select a Payment Method (Cash, UPI, Bank, Card)');
+    if (!name.trim()) {
+      setSaveError(t('pleaseEnterTxName') || 'Please enter a transaction name');
+      return;
+    }
+
+    if (paymentMethod === 'UPI' && (!accountId || accountId === 'CASH')) {
+      setSaveError(language === 'ta' ? 'வங்கி கணக்கைத் தேர்ந்தெடுக்கவும்' : 'Please select a Bank Account for UPI transaction');
       return;
     }
 
@@ -146,126 +235,153 @@ export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialTyp
         transactionName: name.trim(),
         name: name.trim(),
         paymentMethod,
-        description: description || '',
+        accountId: paymentMethod === 'CASH' ? 'CASH' : accountId,
+        description: description.trim(),
         date
       });
 
       clearCache();
-      onClose();
       if (onSuccess) onSuccess();
+      onClose();
     } catch (err) {
-      setSaveError(err.message || (language === 'ta' ? 'சேமிக்க முடியவில்லை. மீண்டும் முயற்சிக்கவும்.' : 'Failed to save transaction. Please try again.'));
+      console.error('Failed to save voice transaction:', err);
+      setSaveError(err.message || 'Failed to save transaction');
     } finally {
       setSaveLoading(false);
     }
   };
 
-  const handleLangToggle = (lang) => {
-    setVoiceLang(lang);
-    localStorage.setItem('cashly_voice_lang', lang);
-    if (isListening) {
-      speechService.stopListening();
-      setTimeout(() => startVoiceRecognition(), 200);
-    }
-  };
-
   if (!isOpen) return null;
 
-  return (
-    <div style={{
-      position: 'fixed',
-      inset: 0,
-      backgroundColor: 'rgba(5, 15, 12, 0.75)',
-      backdropFilter: 'blur(6px)',
-      zIndex: 9999,
-      display: 'flex',
-      alignItems: 'flex-end',
-      justifyContent: 'center',
-      padding: '16px'
-    }}>
-      <div className="mobile-app-shell" style={{
-        width: '100%',
-        maxWidth: '440px',
-        maxHeight: '90vh',
-        backgroundColor: '#FFFFFF',
-        borderRadius: '24px',
-        overflow: 'hidden',
-        boxShadow: '0 20px 40px rgba(0,0,0,0.3)',
+  const isIncome = type === 'INCOME';
+  const themeColor = isIncome ? '#16A34A' : '#DC2626';
+
+  return createPortal(
+    <div
+      className="sheet-backdrop"
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.65)',
+        zIndex: 100000,
         display: 'flex',
-        flexDirection: 'column'
-      }}>
-        {/* Modal Header */}
-        <div style={{
-          padding: '16px 20px',
-          borderBottom: '1px solid var(--border-color)',
+        justifyContent: 'center',
+        alignItems: 'flex-end',
+        animation: 'fadeIn 0.2s ease-out'
+      }}
+    >
+      <div
+        className="sheet-container"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: '100%',
+          maxWidth: '480px',
+          backgroundColor: '#FFFFFF',
+          borderTopLeftRadius: '24px',
+          borderTopRightRadius: '24px',
+          padding: '20px 18px',
+          boxShadow: '0 -8px 30px rgba(0,0,0,0.25)',
+          animation: 'slideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1)',
+          maxHeight: '90vh',
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          backgroundColor: '#F8FAFC'
-        }}>
+          flexDirection: 'column'
+        }}
+      >
+        {/* Header Bar */}
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingBottom: '14px',
+            borderBottom: '1px solid #E2E8F0',
+            marginBottom: '14px'
+          }}
+        >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <div style={{
-              width: '32px',
-              height: '32px',
-              borderRadius: '10px',
-              backgroundColor: '#021A1A',
-              color: '#FFF',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center'
-            }}>
-              <Mic size={18} />
+            <div
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: '50%',
+                backgroundColor: '#EEF2FF',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              <Mic size={20} color="#4F46E5" />
             </div>
-            <span style={{ fontWeight: '700', fontSize: '16px', color: 'var(--text-primary)' }}>
-              {t('voiceTitle') || 'Voice Entry / குரல் பதிவு'}
-            </span>
+            <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A', margin: 0 }}>
+              {t('voiceEntry')}
+            </h3>
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Language Selector Pills */}
-            <div style={{ display: 'flex', backgroundColor: '#E2E8F0', borderRadius: '20px', padding: '2px' }}>
+            {/* Voice Language Toggle (Tamil / English) */}
+            <div style={{ display: 'flex', background: '#F1F5F9', borderRadius: '8px', padding: '2px' }}>
               <button
                 type="button"
-                onClick={() => handleLangToggle('ta')}
+                onClick={() => {
+                  setVoiceLang('ta-IN');
+                  localStorage.setItem('cashly_voice_lang', 'ta-IN');
+                  if (step === 'listening') startVoiceRecognition('ta-IN');
+                }}
                 style={{
-                  padding: '4px 10px',
-                  borderRadius: '16px',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
                   border: 'none',
                   fontSize: '12px',
                   fontWeight: '700',
-                  backgroundColor: voiceLang === 'ta' ? '#021A1A' : 'transparent',
-                  color: voiceLang === 'ta' ? '#FFFFFF' : '#475569',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  backgroundColor: voiceLang.startsWith('ta') ? '#4F46E5' : 'transparent',
+                  color: voiceLang.startsWith('ta') ? '#FFFFFF' : '#64748B'
                 }}
               >
                 தமிழ்
               </button>
               <button
                 type="button"
-                onClick={() => handleLangToggle('en')}
+                onClick={() => {
+                  setVoiceLang('en-IN');
+                  localStorage.setItem('cashly_voice_lang', 'en-IN');
+                  if (step === 'listening') startVoiceRecognition('en-IN');
+                }}
                 style={{
-                  padding: '4px 10px',
-                  borderRadius: '16px',
+                  padding: '4px 8px',
+                  borderRadius: '6px',
                   border: 'none',
                   fontSize: '12px',
                   fontWeight: '700',
-                  backgroundColor: voiceLang === 'en' ? '#021A1A' : 'transparent',
-                  color: voiceLang === 'en' ? '#FFFFFF' : '#475569',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  backgroundColor: voiceLang.startsWith('en') ? '#4F46E5' : 'transparent',
+                  color: voiceLang.startsWith('en') ? '#FFFFFF' : '#64748B'
                 }}
               >
                 English
               </button>
             </div>
 
+            {/* Close Button */}
             <button
-              onClick={() => { speechService.stopListening(); onClose(); }}
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
               style={{
-                background: 'none',
+                background: '#F1F5F9',
                 border: 'none',
-                padding: '6px',
-                color: 'var(--text-secondary)',
-                cursor: 'pointer'
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: '#334155'
               }}
             >
               <X size={20} />
@@ -273,477 +389,501 @@ export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialTyp
           </div>
         </div>
 
-        {/* Modal Body */}
-        <div style={{ padding: '20px', overflowY: 'auto', flex: 1 }}>
+        {/* STEP 1: LISTENING VIEW */}
+        {step === 'listening' && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '24px 12px 16px', textAlign: 'center' }}>
+            <button
+              type="button"
+              onClick={() => isListening ? handleStopListening() : startVoiceRecognition()}
+              aria-label={isListening ? t('tapToStop') : t('tapToSpeak')}
+              style={{
+                width: '96px',
+                height: '96px',
+                borderRadius: '50%',
+                backgroundColor: isListening ? '#FEE2E2' : '#EEF2FF',
+                border: isListening ? '3px solid #DC2626' : '3px solid #6366F1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '18px',
+                boxShadow: isListening ? '0 0 0 14px rgba(239, 68, 68, 0.2)' : '0 8px 24px rgba(79, 70, 229, 0.15)',
+                transition: 'all 0.25s ease',
+                cursor: 'pointer',
+                outline: 'none',
+                WebkitTapHighlightColor: 'transparent'
+              }}
+            >
+              <Mic size={44} color={isListening ? '#DC2626' : '#4F46E5'} />
+            </button>
 
-          {/* STEP 1: LISTENING STATE */}
-          {step === 'listening' && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', padding: '10px 0' }}>
-              <div style={{ position: 'relative', margin: '16px 0' }}>
-                <div style={{
-                  width: '86px',
-                  height: '86px',
-                  borderRadius: '50%',
-                  backgroundColor: isListening ? '#EF4444' : '#021A1A',
-                  color: '#FFF',
+            <div style={{ fontSize: '18px', fontWeight: '800', color: '#0F172A', marginBottom: '8px' }}>
+              {isListening ? t('listening') : t('tapToSpeak')}
+            </div>
+
+            {transcript ? (
+              <div
+                style={{
+                  background: '#F8FAFC',
+                  border: '1.5px solid #E2E8F0',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  width: '100%',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  color: '#1E293B',
+                  minHeight: '60px',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  boxShadow: isListening ? '0 0 0 12px rgba(239, 68, 68, 0.2)' : '0 10px 25px rgba(2, 26, 26, 0.3)',
-                  transition: 'all 0.3s ease'
-                }}>
-                  <Mic size={38} className={isListening ? 'pulse-icon' : ''} />
-                </div>
+                  marginBottom: '18px'
+                }}
+              >
+                "{transcript}"
               </div>
-
-              <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '4px' }}>
-                {isListening ? (t('listening') || 'Listening... / கேட்கிறது...') : (t('speakNow') || 'Speak Now / பேசுங்கள்')}
-              </h3>
-
-              {/* Sample Hints */}
-              <div style={{ fontSize: '12px', color: 'var(--text-secondary)', maxWidth: '300px', marginBottom: '16px', lineHeight: '1.5' }}>
-                {voiceLang === 'ta' ? (
-                  <>
-                    <div>💡 <i>"{t('voiceHint1') || 'காய்கறி 250 ரூபாய் செலவு'}"</i></div>
-                    <div>💡 <i>"{t('voiceHint2') || 'பெட்ரோல் 600 ரூபாய் UPI செலவு'}"</i></div>
-                  </>
-                ) : (
-                  <>
-                    <div>💡 <i>"{t('voiceHint1') || '250 rupees vegetables cash expense'}"</i></div>
-                    <div>💡 <i>"{t('voiceHint2') || '600 rupees petrol UPI expense'}"</i></div>
-                  </>
-                )}
+            ) : (
+              <div style={{ color: '#64748B', fontSize: '13px', marginBottom: '24px', lineHeight: '1.4' }}>
+                {language === 'ta'
+                  ? 'எ.கா: "பெட்ரோல் 500 செலவு" அல்லது "அப்பா 5000 வரவு"'
+                  : 'e.g. "Petrol 500 expense" or "Salary 5000 income"'}
               </div>
+            )}
 
-              {/* Transcript Display Box */}
-              <div style={{
-                width: '100%',
-                minHeight: '70px',
-                padding: '14px',
-                backgroundColor: '#F1F5F9',
-                borderRadius: '14px',
-                fontSize: '15px',
-                fontWeight: '600',
-                color: transcript ? '#0F172A' : '#94A3B8',
-                fontStyle: transcript ? 'normal' : 'italic',
-                marginBottom: '16px',
-                textAlign: 'left',
-                border: '1px solid #E2E8F0'
-              }}>
-                {transcript || (t('listeningPlaceholder') || 'Speech will appear here as you speak...')}
+            {voiceError && (
+              <div style={{ background: '#FEE2E2', color: '#DC2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', marginBottom: '16px', width: '100%' }}>
+                {voiceError}
               </div>
+            )}
 
-              {/* Voice Error Banner */}
-              {voiceError && (
-                <div style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#FEE2E2',
-                  border: '1px solid #FCA5A5',
-                  color: '#991B1B',
-                  borderRadius: '12px',
-                  fontSize: '13px',
-                  marginBottom: '16px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <AlertCircle size={16} />
-                  <span>{voiceError}</span>
-                </div>
+            <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+              {isListening ? (
+                <button
+                  type="button"
+                  onClick={handleStopListening}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    backgroundColor: '#DC2626',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {t('tapToStop')}
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => startVoiceRecognition()}
+                  style={{
+                    flex: 1,
+                    padding: '14px',
+                    backgroundColor: '#4F46E5',
+                    color: '#FFFFFF',
+                    border: 'none',
+                    borderRadius: '12px',
+                    fontSize: '16px',
+                    fontWeight: '800',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {t('tapToSpeak')}
+                </button>
               )}
+            </div>
+          </div>
+        )}
 
-              {/* Action Buttons with HIGH CONTRAST */}
-              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                {isListening ? (
-                  <button
-                    type="button"
-                    onClick={handleStopListening}
-                    style={{
-                      flex: 1,
-                      padding: '14px',
-                      borderRadius: '14px',
-                      fontWeight: '700',
-                      fontSize: '15px',
-                      backgroundColor: '#021A1A',
-                      color: '#FFFFFF',
-                      border: 'none',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      cursor: 'pointer',
-                      boxShadow: '0 4px 12px rgba(2,26,26,0.2)'
-                    }}
-                  >
-                    <Check size={18} /> {t('confirm') || 'Done Speaking / Fill Details'}
-                  </button>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={startVoiceRecognition}
-                      style={{
-                        flex: 1,
-                        padding: '14px',
-                        borderRadius: '14px',
-                        fontWeight: '700',
-                        fontSize: '15px',
-                        backgroundColor: '#F1F5F9',
-                        color: '#0F172A',
-                        border: '1.5px solid #CBD5E1',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <RefreshCw size={16} /> {t('tryAgain') || 'Try Again'}
-                    </button>
-
-                    {transcript.trim() && (
-                      <button
-                        type="button"
-                        onClick={() => processTranscript(transcript)}
-                        style={{
-                          flex: 1,
-                          padding: '14px',
-                          borderRadius: '14px',
-                          fontWeight: '700',
-                          fontSize: '15px',
-                          backgroundColor: '#021A1A',
-                          color: '#FFFFFF',
-                          border: 'none',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '6px',
-                          cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(2,26,26,0.2)'
-                        }}
-                      >
-                        {t('confirm') || 'Fill Details'} <ArrowRight size={16} />
-                      </button>
-                    )}
-                  </>
-                )}
+        {/* STEP 2: REVIEW TRANSACTION FORM (Matches Add Transaction structure exactly) */}
+        {step === 'review' && (
+          <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '14px', paddingRight: '2px' }}>
+            {/* Top Speech Transcript Box */}
+            <div
+              style={{
+                backgroundColor: '#F8FAFC',
+                border: '1.5px solid #E2E8F0',
+                borderRadius: '14px',
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '6px'
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '12px', fontWeight: '800', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  {t('speechTranscript')}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => startVoiceRecognition()}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#4F46E5',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <RefreshCw size={12} />
+                  {t('recordAgain')}
+                </button>
+              </div>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: '#0F172A', fontStyle: 'italic' }}>
+                "{transcript || latestTextRef.current}"
               </div>
             </div>
-          )}
 
-          {/* STEP 2: REVIEW & CONFIRMATION CARD (NEVER AUTO-SAVES!) */}
-          {step === 'review' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {/* Error Alert */}
+            {saveError && (
+              <div style={{ background: '#FEE2E2', color: '#DC2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: '600' }}>
+                {saveError}
+              </div>
+            )}
 
-              {/* Speech Heard Box */}
-              <div style={{
-                padding: '12px 14px',
-                backgroundColor: '#F8FAFC',
-                borderRadius: '12px',
-                borderLeft: '4px solid #021A1A'
-              }}>
-                <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px' }}>
-                  {language === 'ta' ? 'பேசப்பட்ட உரை' : 'Speech Transcript'}
-                </div>
-                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1E293B' }}>
-                  "{transcript}"
-                </div>
+            {/* Income / Expense Switcher */}
+            <div style={{ display: 'flex', background: '#F1F5F9', borderRadius: '10px', padding: '4px' }}>
+              <button
+                type="button"
+                onClick={() => setType('INCOME')}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  backgroundColor: isIncome ? '#16A34A' : 'transparent',
+                  color: isIncome ? '#FFFFFF' : '#64748B'
+                }}
+              >
+                {t('income')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setType('EXPENSE')}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '15px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  backgroundColor: !isIncome ? '#DC2626' : 'transparent',
+                  color: !isIncome ? '#FFFFFF' : '#64748B'
+                }}
+              >
+                {t('expense')}
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveTransaction} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {/* 1. Transaction Name */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#1E293B', marginBottom: '6px' }}>
+                  {t('transactionName')} *
+                </label>
+                <TransactionNameAutocomplete
+                  value={name}
+                  onChange={setName}
+                  type={type}
+                  placeholder={t('transactionNamePlaceholder') || 'e.g. Petrol, Groceries, Salary'}
+                  required
+                />
               </div>
 
-              <div style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-primary)', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' }}>
-                {t('reviewTransaction') || 'Review & Confirm Transaction / விவரங்களை சரிபார்க்கவும்'}
-              </div>
-
-              {saveError && (
-                <div style={{
-                  padding: '10px 14px',
-                  backgroundColor: '#FEE2E2',
-                  border: '1px solid #FCA5A5',
-                  color: '#991B1B',
-                  borderRadius: '10px',
-                  fontSize: '13px'
-                }}>
-                  {saveError}
-                </div>
-              )}
-
-              <form onSubmit={handleSaveTransaction} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                
-                {/* Type Selection Pills */}
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
-                    Transaction Type
-                  </label>
-                  <div style={{ display: 'flex', gap: '10px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setType('EXPENSE')}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        borderRadius: '12px',
-                        border: type === 'EXPENSE' ? '2px solid #EF4444' : '1px solid #E2E8F0',
-                        backgroundColor: type === 'EXPENSE' ? '#FEF2F2' : '#FFFFFF',
-                        color: type === 'EXPENSE' ? '#991B1B' : '#64748B',
-                        fontWeight: '700',
-                        fontSize: '14px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Expense (செலவு)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setType('INCOME')}
-                      style={{
-                        flex: 1,
-                        padding: '10px',
-                        borderRadius: '12px',
-                        border: type === 'INCOME' ? '2px solid #10B981' : '1px solid #E2E8F0',
-                        backgroundColor: type === 'INCOME' ? '#ECFDF5' : '#FFFFFF',
-                        color: type === 'INCOME' ? '#065F46' : '#64748B',
-                        fontWeight: '700',
-                        fontSize: '14px',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      Income (வரவு)
-                    </button>
-                  </div>
-                </div>
-
-                {/* Amount Input */}
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-                    Amount (தொகை) *
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <span style={{
-                      position: 'absolute',
-                      left: '14px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      fontSize: '18px',
-                      fontWeight: '700',
-                      color: '#021A1A'
-                    }}>
-                      ₹
-                    </span>
-                    <input
-                      type="number"
-                      step="any"
-                      placeholder="0.00"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      required
-                      style={{
-                        width: '100%',
-                        padding: '12px 14px 12px 34px',
-                        borderRadius: '12px',
-                        border: !amount ? '2px solid #F59E0B' : '1px solid #CBD5E1',
-                        fontSize: '18px',
-                        fontWeight: '700',
-                        color: '#0F172A',
-                        backgroundColor: !amount ? '#FFFBEB' : '#FFFFFF',
-                        outline: 'none'
-                      }}
-                    />
-                  </div>
-                  {!amount && (
-                    <div style={{ fontSize: '11px', color: '#D97706', marginTop: '4px', fontWeight: '600' }}>
-                      ⚠️ Please enter amount if speech did not specify number
-                    </div>
-                  )}
-                </div>
-
-                {/* Transaction Name Input */}
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-                    {t('transactionName') || 'Transaction Name (பதிவு பெயர்)'}
-                  </label>
+              {/* 2. Amount */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#1E293B', marginBottom: '6px' }}>
+                  {t('amount')} (₹) *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', fontSize: '18px', fontWeight: '800', color: themeColor }}>
+                    ₹
+                  </span>
                   <input
-                    type="text"
-                    placeholder={t('enterTransactionName') || 'Enter transaction name'}
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
+                    type="number"
+                    step="any"
+                    placeholder="0.00"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
                     style={{
                       width: '100%',
-                      padding: '12px 14px',
-                      borderRadius: '12px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '15px',
-                      fontWeight: '600',
-                      color: '#0F172A',
-                      backgroundColor: '#FFFFFF',
-                      outline: 'none'
+                      padding: '12px 14px 12px 36px',
+                      fontSize: '18px',
+                      fontWeight: '800',
+                      borderRadius: '10px',
+                      border: '1.5px solid #CBD5E1',
+                      outline: 'none',
+                      color: themeColor,
+                      backgroundColor: '#FAFAFA'
                     }}
+                    required
                   />
                 </div>
+              </div>
 
-                {/* Payment Method Pills */}
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
-                    Payment Method (செலுத்தும் முறை) *
-                  </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
-                    {['CASH', 'UPI'].map((pm) => (
-                      <button
-                        key={pm}
-                        type="button"
-                        onClick={() => setPaymentMethod(pm)}
-                        style={{
-                          padding: '10px 4px',
-                          borderRadius: '10px',
-                          border: paymentMethod === pm ? '2px solid #021A1A' : '1px solid #CBD5E1',
-                          backgroundColor: paymentMethod === pm ? '#021A1A' : '#FFFFFF',
-                          color: paymentMethod === pm ? '#FFFFFF' : '#334155',
-                          fontWeight: '700',
-                          fontSize: '12px',
-                          cursor: 'pointer',
-                          textAlign: 'center'
-                        }}
-                      >
-                        {pm}
-                      </button>
-                    ))}
-                  </div>
-                  {!paymentMethod && (
-                    <div style={{ fontSize: '11px', color: '#D97706', marginTop: '4px', fontWeight: '600' }}>
-                      ⚠️ Please select Cash or UPI
-                    </div>
-                  )}
-                </div>
+              {/* 3. Description (Optional) */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#1E293B', marginBottom: '6px' }}>
+                  {t('descriptionOptional')}
+                </label>
+                <input
+                  type="text"
+                  placeholder={t('descriptionOptional') || 'Enter description'}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    borderRadius: '10px',
+                    border: '1.5px solid #CBD5E1',
+                    outline: 'none',
+                    color: '#1E293B',
+                    backgroundColor: '#FAFAFA'
+                  }}
+                />
+              </div>
 
-                {/* Category Selection */}
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-                    Category (வகை)
-                  </label>
-                  <select
-                    value={category}
-                    onChange={(e) => setCategory(e.target.value)}
+              {/* 4. Payment Method */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#1E293B', marginBottom: '6px' }}>
+                  {t('paymentMethod')}
+                </label>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('CASH')}
                     style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '12px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      color: '#0F172A',
-                      backgroundColor: '#FFFFFF'
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: `1.5px solid ${paymentMethod === 'CASH' ? '#16A34A' : '#CBD5E1'}`,
+                      backgroundColor: paymentMethod === 'CASH' ? '#DCFCE7' : '#FFFFFF',
+                      color: paymentMethod === 'CASH' ? '#16A34A' : '#64748B',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
                     }}
                   >
-                    {categories.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
+                    💵 {t('cash')} ({t('cashAtHome') || 'Cash at Home'})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMethod('UPI')}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: '10px',
+                      border: `1.5px solid ${paymentMethod === 'UPI' ? '#4338CA' : '#CBD5E1'}`,
+                      backgroundColor: paymentMethod === 'UPI' ? '#EEF2FF' : '#FFFFFF',
+                      color: paymentMethod === 'UPI' ? '#4338CA' : '#64748B',
+                      fontSize: '13px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    📱 {t('upi') || 'UPI'}
+                  </button>
                 </div>
 
-                {/* Date Selection */}
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-                    Date (தேதி)
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="date"
-                      value={date}
-                      onChange={(e) => setDate(e.target.value)}
+                {/* Bank Account Dropdown for UPI */}
+                {paymentMethod === 'UPI' && (
+                  <div style={{ marginTop: '10px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: '700', color: '#1E293B' }}>
+                        {t('selectBankAccount')} *
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddBankModal(true)}
+                        style={{ background: 'none', border: 'none', color: '#16247B', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        + {t('addBankAccount')}
+                      </button>
+                    </div>
+                    <select
+                      value={accountId}
+                      onChange={(e) => setAccountId(e.target.value)}
                       style={{
                         width: '100%',
-                        padding: '12px 14px',
-                        borderRadius: '12px',
-                        border: '1px solid #CBD5E1',
+                        padding: '10px 12px',
+                        borderRadius: '8px',
+                        border: '1.5px solid #CBD5E1',
+                        background: '#FFF',
                         fontSize: '14px',
                         fontWeight: '600',
-                        color: '#0F172A',
-                        backgroundColor: '#FFFFFF'
+                        color: accountId ? '#1E293B' : '#64748B',
+                        outline: 'none'
                       }}
-                    />
+                      required
+                    >
+                      <option value="">-- {t('selectBankAccount')} --</option>
+                      {bankAccounts.map((acc) => (
+                        <option key={acc.id} value={acc.id}>
+                          {acc.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                </div>
+                )}
+              </div>
 
-                {/* Transaction Name / Description Input */}
-                <div>
-                  <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '4px', display: 'block' }}>
-                    Transaction Name / Description (பொருளின் பெயர் / குறிப்பு)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="What was this for? (e.g. Peanut Candy, Salary)"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      borderRadius: '12px',
-                      border: '1px solid #CBD5E1',
-                      fontSize: '14px',
-                      color: '#0F172A',
-                      backgroundColor: '#FFFFFF'
-                    }}
-                  />
-                </div>
+              {/* 5. Date */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '800', color: '#1E293B', marginBottom: '6px' }}>
+                  {t('date')}
+                </label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px 14px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    borderRadius: '10px',
+                    border: '1.5px solid #CBD5E1',
+                    outline: 'none',
+                    color: '#1E293B',
+                    backgroundColor: '#FAFAFA'
+                  }}
+                  required
+                />
+              </div>
 
-                {/* Save Buttons */}
-                <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
-                  <button
-                    type="button"
-                    onClick={startVoiceRecognition}
-                    style={{
-                      padding: '14px',
-                      borderRadius: '14px',
-                      border: '1px solid #CBD5E1',
-                      backgroundColor: '#F1F5F9',
-                      color: '#334155',
-                      fontWeight: '700',
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px'
-                    }}
-                  >
-                    <RefreshCw size={16} /> {t('reSpeak') || 'Re-speak'}
-                  </button>
+              {/* Save & Cancel Buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="submit"
+                  disabled={saveLoading}
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    borderRadius: '12px',
+                    border: 'none',
+                    backgroundColor: themeColor,
+                    color: '#FFFFFF',
+                    fontSize: '16px',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px'
+                  }}
+                >
+                  <Save size={18} />
+                  {saveLoading ? '...' : (isIncome ? t('saveIncome') : t('saveExpense'))}
+                </button>
 
-                  <button
-                    type="submit"
-                    disabled={saveLoading}
-                    style={{
-                      flex: 1,
-                      padding: '14px',
-                      borderRadius: '14px',
-                      border: 'none',
-                      backgroundColor: type === 'EXPENSE' ? '#EF4444' : '#10B981',
-                      color: '#FFFFFF',
-                      fontWeight: '700',
-                      fontSize: '15px',
-                      cursor: saveLoading ? 'not-allowed' : 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
-                    }}
-                  >
-                    {saveLoading ? 'Saving...' : (
-                      <>
-                        <Check size={18} />
-                        {type === 'EXPENSE' ? (t('saveExpense') || 'Save Expense') : (t('saveIncome') || 'Save Income')}
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-        </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  disabled={saveLoading}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: 'transparent',
+                    color: '#64748B',
+                    border: 'none',
+                    fontSize: '14px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                    textAlign: 'center'
+                  }}
+                >
+                  {t('cancel')}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
       </div>
-    </div>
+
+      {/* Quick Add Bank Account Dialog */}
+      {showAddBankModal && (
+        <div className="confirm-backdrop" onClick={() => setShowAddBankModal(false)} style={{ zIndex: 100002 }}>
+          <div className="confirm-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '400px', width: '90%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', borderBottom: '1px solid #E2E8F0', paddingBottom: '8px' }}>
+              <div style={{ fontSize: '17px', fontWeight: '800', color: '#1E293B' }}>
+                {t('addBankAccount')}
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddBankModal(false)}
+                style={{ background: '#F1F5F9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {quickBankError && (
+              <div style={{ background: '#FEE2E2', color: '#DC2626', padding: '8px 12px', borderRadius: '8px', marginBottom: '12px', fontSize: '13px', fontWeight: '600' }}>
+                {quickBankError}
+              </div>
+            )}
+
+            <form onSubmit={handleQuickAddBank} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>
+                  {t('bankName')} *
+                </label>
+                <input
+                  type="text"
+                  placeholder={t('enterBankName')}
+                  value={quickBankName}
+                  onChange={(e) => setQuickBankName(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: '14px', borderRadius: '8px', border: '1.5px solid #CBD5E1', outline: 'none', background: '#FAFAFA' }}
+                  required
+                  autoFocus
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '12px', fontWeight: '700', color: '#1E293B', marginBottom: '4px', display: 'block' }}>
+                  {t('openingBalance')} (₹)
+                </label>
+                <input
+                  type="number"
+                  step="any"
+                  placeholder="0.00"
+                  value={quickOpeningBalance}
+                  onChange={(e) => setQuickOpeningBalance(e.target.value)}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: '15px', fontWeight: '700', borderRadius: '8px', border: '1.5px solid #CBD5E1', outline: 'none', background: '#FAFAFA' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowAddBankModal(false)}
+                  disabled={quickBankLoading}
+                  style={{ flex: 1, padding: '10px', background: '#F1F5F9', color: '#334155', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={quickBankLoading}
+                  style={{ flex: 1, padding: '10px', background: '#16247B', color: '#FFFFFF', border: 'none', borderRadius: '8px', fontWeight: '700', cursor: 'pointer' }}
+                >
+                  {quickBankLoading ? '...' : (t('save') || 'Save')}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>,
+    document.body
   );
 }

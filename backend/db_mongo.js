@@ -71,6 +71,7 @@ transactionSchema.pre('save', function (next) {
 transactionSchema.index({ userId: 1, date: -1, createdAt: -1 });
 transactionSchema.index({ userId: 1, type: 1 });
 transactionSchema.index({ userId: 1, accountId: 1 });
+transactionSchema.index({ userId: 1, accountId: 1, type: 1, amount: 1 });
 
 // Bank Account Schema
 const bankAccountSchema = new mongoose.Schema({

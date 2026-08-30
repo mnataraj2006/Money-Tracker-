@@ -10,7 +10,16 @@
       ],
       "serverClientId": "760935628306-adaehnvi7ktav0u2hsq0kr0mt4fheife.apps.googleusercontent.com",
       "forceCodeForRefreshToken": true
+    },
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": true,
+      "backgroundColor": "#F8FAFC",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "splashFullScreen": false,
+      "splashImmersive": false
     }
   }
 }
-

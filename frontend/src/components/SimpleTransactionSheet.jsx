@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Trash2, Save, Plus } from 'lucide-react';
+import { X, Trash2, Save, Plus, AlertTriangle } from 'lucide-react';
 import { transactionsAPI, bankAccountsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useDataCache } from '../context/DataContext';
+import { useRegisterModal } from '../context/NavigationContext';
 import TransactionNameAutocomplete from './TransactionNameAutocomplete';
 
 export default function SimpleTransactionSheet({
@@ -33,6 +34,10 @@ export default function SimpleTransactionSheet({
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [showConfirmDiscard, setShowConfirmDiscard] = useState(false);
+
+  // Initial snapshot to detect unsaved changes
+  const initialValuesRef = useRef(null);
 
   // Quick Add Bank Account modal state
   const [showAddBankModal, setShowAddBankModal] = useState(false);
@@ -44,29 +49,97 @@ export default function SimpleTransactionSheet({
   useEffect(() => {
     if (isOpen) {
       loadBankAccounts();
+      let initName = '';
+      let initAmount = '';
+      let initDesc = '';
+      let initType = 'EXPENSE';
+      let initPm = 'CASH';
+      let initAcc = '';
+
       if (editTx) {
-        setType(editTx.type === 'INCOME' ? 'INCOME' : 'EXPENSE');
-        setAmount(editTx.amount ? String(editTx.amount) : '');
-        setName(editTx.transactionName || editTx.name || '');
-        setPaymentMethod(editTx.paymentMethod || 'CASH');
-        setAccountId(editTx.accountId && editTx.accountId !== 'CASH' ? editTx.accountId : '');
-        setDate(editTx.date ? editTx.date.split('T')[0] : (initialDate || todayDateStr));
+        initType = editTx.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+        initAmount = editTx.amount ? String(editTx.amount) : '';
+        initName = editTx.transactionName || editTx.name || '';
+        initPm = editTx.paymentMethod || 'CASH';
+        initAcc = editTx.accountId && editTx.accountId !== 'CASH' ? editTx.accountId : '';
         const rawDesc = editTx.description || editTx.note || '';
-        setDescription(rawDesc === 'string' ? '' : rawDesc);
+        initDesc = rawDesc === 'string' ? '' : rawDesc;
+
+        setType(initType);
+        setAmount(initAmount);
+        setName(initName);
+        setPaymentMethod(initPm);
+        setAccountId(initAcc);
+        setDate(editTx.date ? editTx.date.split('T')[0] : (initialDate || todayDateStr));
+        setDescription(initDesc);
       } else {
-        setType(presetType || 'EXPENSE');
-        setAmount(presetAmount ? String(presetAmount) : '');
-        setName(presetName || '');
+        initType = presetType || 'EXPENSE';
+        initAmount = presetAmount ? String(presetAmount) : '';
+        initName = presetName || '';
+        initPm = 'CASH';
+        initAcc = '';
+        const rawNote = presetNote || '';
+        initDesc = rawNote === 'string' ? '' : rawNote;
+
+        setType(initType);
+        setAmount(initAmount);
+        setName(initName);
         setPaymentMethod('CASH');
         setAccountId('');
         setDate(initialDate || todayDateStr);
-        const rawNote = presetNote || '';
-        setDescription(rawNote === 'string' ? '' : rawNote);
+        setDescription(initDesc);
       }
+
+      initialValuesRef.current = {
+        name: initName.trim(),
+        amount: initAmount.trim(),
+        description: initDesc.trim(),
+        type: initType,
+        paymentMethod: initPm,
+        accountId: initAcc
+      };
+
       setErrorMsg('');
       setShowConfirmDelete(false);
+      setShowConfirmDiscard(false);
     }
   }, [isOpen, editTx, presetType, presetName, presetAmount, presetNote, initialDate]);
+
+  const isFormDirty = () => {
+    const init = initialValuesRef.current;
+    if (!init) return false;
+    const nameChanged = name.trim() !== init.name;
+    const amountChanged = amount.trim() !== init.amount;
+    const descChanged = description.trim() !== init.description;
+    const typeChanged = type !== init.type;
+    const pmChanged = paymentMethod !== init.paymentMethod;
+    const accChanged = accountId !== init.accountId;
+    return nameChanged || amountChanged || descChanged || typeChanged || pmChanged || accChanged;
+  };
+
+  const handleDismiss = () => {
+    if (showConfirmDiscard) {
+      setShowConfirmDiscard(false);
+      return true;
+    }
+    if (showAddBankModal) {
+      setShowAddBankModal(false);
+      return true;
+    }
+    if (showConfirmDelete) {
+      setShowConfirmDelete(false);
+      return true;
+    }
+    if (isFormDirty()) {
+      setShowConfirmDiscard(true);
+      return true;
+    }
+    onClose();
+    return true;
+  };
+
+  // Register with modal back stack
+  useRegisterModal(isOpen, handleDismiss);
 
   const loadBankAccounts = async () => {
     try {
@@ -187,21 +260,17 @@ export default function SimpleTransactionSheet({
 
   return createPortal(
     <>
-      <div className="sheet-backdrop" onClick={onClose} style={{ zIndex: 99999 }}>
+      <div className="sheet-backdrop" onClick={handleDismiss} style={{ zIndex: 100000 }}>
         <div className="sheet-container" onClick={(e) => e.stopPropagation()}>
-          {/* Header */}
+          {/* Header Bar */}
           <div className="sheet-header" style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             marginBottom: '16px',
-            paddingBottom: '8px',
-            borderBottom: '1px solid #E2E8F0',
-            width: '100%'
+            position: 'relative'
           }}>
-            <div style={{ width: '40px' }} />
-            
-            <h3 className="sheet-title" style={{
+            <h3 style={{
               fontSize: '20px',
               fontWeight: '800',
               margin: 0,
@@ -217,7 +286,7 @@ export default function SimpleTransactionSheet({
               className="sheet-close-btn"
               onClick={(e) => {
                 e.stopPropagation();
-                if (onClose) onClose();
+                handleDismiss();
               }}
               aria-label="Close"
               style={{
@@ -535,7 +604,7 @@ export default function SimpleTransactionSheet({
             {/* Cancel Button */}
             <button
               type="button"
-              onClick={onClose}
+              onClick={handleDismiss}
               disabled={loading}
               style={{
                 width: '100%',
@@ -678,6 +747,60 @@ export default function SimpleTransactionSheet({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Discard Confirmation Dialog */}
+      {showConfirmDiscard && (
+        <div className="confirm-backdrop" onClick={() => setShowConfirmDiscard(false)} style={{ zIndex: 100003 }}>
+          <div className="confirm-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '380px', width: '90%', textAlign: 'center' }}>
+            <AlertTriangle size={40} color="#DC2626" style={{ margin: '0 auto 10px' }} />
+            <div style={{ fontSize: '18px', fontWeight: '800', color: '#1E293B', marginBottom: '6px' }}>
+              {t('discardTransaction')}
+            </div>
+            <div style={{ fontSize: '14px', color: '#64748B', marginBottom: '18px', lineHeight: '1.4' }}>
+              {t('unsavedChangesMessage')}
+            </div>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setShowConfirmDiscard(false)}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: '#F1F5F9',
+                  color: '#334155',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                {t('cancel')}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowConfirmDiscard(false);
+                  onClose();
+                }}
+                style={{
+                  flex: 1,
+                  padding: '12px',
+                  background: '#DC2626',
+                  color: '#FFFFFF',
+                  border: 'none',
+                  borderRadius: '10px',
+                  fontSize: '14px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                {t('discard')}
+              </button>
+            </div>
           </div>
         </div>
       )}

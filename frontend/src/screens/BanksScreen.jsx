@@ -3,31 +3,50 @@ import { Landmark, Plus, ArrowRight, ShieldCheck, AlertCircle, RefreshCw, X, Che
 import PageContainer from '../components/PageContainer';
 import { bankAccountsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
+import { useDataCache } from '../context/DataContext';
+import { useRegisterModal } from '../context/NavigationContext';
 
 export default function BanksScreen({ user, onNavigate }) {
   const { t } = useLanguage();
-  const [bankAccounts, setBankAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { cache, updateCache, clearCache } = useDataCache();
+
+  // Cache-first instant rendering
+  const [bankAccounts, setBankAccounts] = useState(cache.bankAccounts || []);
+  const [loading, setLoading] = useState(!cache.bankAccounts || cache.bankAccounts.length === 0);
   const [error, setError] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  // Register Add Bank modal with back button manager
+  useRegisterModal(isAddModalOpen, () => {
+    setIsAddModalOpen(false);
+    return true;
+  });
+
   const [newBankName, setNewBankName] = useState('');
   const [newOpeningBalance, setNewOpeningBalance] = useState('');
   const [addLoading, setAddLoading] = useState(false);
   const [addError, setAddError] = useState('');
 
   useEffect(() => {
-    loadBankAccounts();
+    const hasCache = !!(cache.bankAccounts && cache.bankAccounts.length > 0);
+    loadBankAccounts(hasCache);
   }, []);
 
-  const loadBankAccounts = async () => {
+  const loadBankAccounts = async (isBackground = false) => {
     try {
-      setLoading(true);
+      if (!isBackground && (!cache.bankAccounts || cache.bankAccounts.length === 0)) {
+        setLoading(true);
+      }
       setError('');
       const data = await bankAccountsAPI.getAll();
-      setBankAccounts(data.bankAccounts || []);
+      const accounts = data.bankAccounts || [];
+      setBankAccounts(accounts);
+      updateCache('bankAccounts', accounts);
     } catch (err) {
       console.error('Failed to load bank accounts:', err);
-      setError(err.message || 'Failed to load bank accounts');
+      if (!cache.bankAccounts || cache.bankAccounts.length === 0) {
+        setError(err.message || 'Failed to load bank accounts');
+      }
     } finally {
       setLoading(false);
     }
@@ -51,7 +70,7 @@ export default function BanksScreen({ user, onNavigate }) {
 
     try {
       setAddLoading(true);
-      const res = await bankAccountsAPI.create({
+      await bankAccountsAPI.create({
         name: cleanName,
         openingBalance: openingVal
       });
@@ -59,7 +78,8 @@ export default function BanksScreen({ user, onNavigate }) {
       setNewBankName('');
       setNewOpeningBalance('');
       setIsAddModalOpen(false);
-      await loadBankAccounts();
+      clearCache();
+      await loadBankAccounts(false);
     } catch (err) {
       setAddError(err.message || 'Failed to add bank account');
     } finally {
@@ -112,23 +132,25 @@ export default function BanksScreen({ user, onNavigate }) {
           padding: '20px',
           display: 'flex',
           flexDirection: 'column',
-          gap: '8px',
-          marginBottom: '16px',
-          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-          color: '#FFFFFF',
+          gap: '6px',
           borderRadius: '16px',
-          boxShadow: '0 4px 16px rgba(15, 23, 42, 0.15)'
+          marginBottom: '16px'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', opacity: 0.85, fontSize: '13px', fontWeight: '600' }}>
-          <Landmark size={18} /> {t('expectedBalance')} (Total)
+        <div style={{ fontSize: '12px', fontWeight: '700', opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.6px' }}>
+          {t('totalBankBalance') || 'Total Expected Balance (Banks)'}
         </div>
-        <div style={{ fontSize: '30px', fontWeight: '800', letterSpacing: '-0.5px' }}>
-          {formatCurrency(totalBankBalance)}
+
+        <div style={{ fontSize: '32px', fontWeight: '800', color: '#FFFFFF', letterSpacing: '-0.5px' }}>
+          {loading && bankAccounts.length === 0 ? '...' : formatCurrency(totalBankBalance)}
+        </div>
+
+        <div style={{ fontSize: '12px', opacity: 0.8, marginTop: '2px' }}>
+          {t('sumAcrossAllAccounts') || 'Calculated from all active bank accounts'}
         </div>
       </div>
 
-      {/* 3. Error Alert */}
+      {/* 3. Error Banner if any */}
       {error && (
         <div style={{
           background: '#FEE2E2',
@@ -143,16 +165,37 @@ export default function BanksScreen({ user, onNavigate }) {
           justifyContent: 'space-between'
         }}>
           <span>{error}</span>
-          <button onClick={loadBankAccounts} style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer' }}>
+          <button onClick={() => loadBankAccounts(false)} style={{ background: 'none', border: 'none', color: '#DC2626', cursor: 'pointer' }}>
             <RefreshCw size={16} />
           </button>
         </div>
       )}
 
       {/* 4. Bank Accounts List */}
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-secondary)' }}>
-          Loading bank accounts...
+      {loading && bankAccounts.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {[1, 2].map((k) => (
+            <div
+              key={k}
+              className="stitch-card"
+              style={{
+                padding: '20px',
+                height: '76px',
+                background: '#FFFFFF',
+                borderRadius: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px'
+              }}
+            >
+              <div style={{ width: '44px', height: '44px', borderRadius: '12px', background: '#E2E8F0', animation: 'pulse 1.5s infinite' }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ width: '100px', height: '16px', background: '#E2E8F0', borderRadius: '4px' }} />
+                <div style={{ width: '60px', height: '12px', background: '#F1F5F9', borderRadius: '4px' }} />
+              </div>
+              <div style={{ width: '80px', height: '20px', background: '#E2E8F0', borderRadius: '4px' }} />
+            </div>
+          ))}
         </div>
       ) : bankAccounts.length === 0 ? (
         <div
@@ -180,10 +223,10 @@ export default function BanksScreen({ user, onNavigate }) {
           </div>
           <div>
             <h3 style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>
-              {t('noBankAccounts')}
+              {t('noBankAccounts') || 'No Bank Accounts Added'}
             </h3>
             <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', margin: 0 }}>
-              {t('tapToAddBankAccount')}
+              {t('tapToAddBankAccount') || 'Tap below to add your first bank account.'}
             </p>
           </div>
           <button
@@ -243,29 +286,33 @@ export default function BanksScreen({ user, onNavigate }) {
                       {hasCheck ? (
                         diff === 0 ? (
                           <span style={{ color: '#16A34A', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <ShieldCheck size={13} /> {t('lastChecked')}: {checkDateStr} (✓)
+                            <ShieldCheck size={13} /> {t('verified') || 'Verified'} {checkDateStr && `(${checkDateStr})`}
+                          </span>
+                        ) : diff > 0 ? (
+                          <span style={{ color: '#D97706', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <AlertCircle size={13} /> +{formatCurrency(diff)} {t('extra') || 'Extra'}
                           </span>
                         ) : (
-                          <span style={{ color: diff > 0 ? '#16A34A' : '#DC2626', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                            <AlertCircle size={13} /> {t('difference')}: {diff > 0 ? `+₹${diff}` : `-₹${Math.abs(diff)}`}
+                          <span style={{ color: '#DC2626', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                            <AlertCircle size={13} /> -{formatCurrency(diff)} {t('short') || 'Short'}
                           </span>
                         )
                       ) : (
                         <span style={{ color: '#94A3B8', fontWeight: '600' }}>
-                          {t('notCheckedYet')}
+                          {t('notVerifiedYet') || 'Not verified yet'}
                         </span>
                       )}
                     </div>
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '18px', fontWeight: '800', color: '#1E293B' }}>
-                      {formatCurrency(account.expectedBalance)}
+                    <div style={{ fontSize: '11px', color: 'var(--text-muted)', fontWeight: '700', textTransform: 'uppercase' }}>
+                      {t('expected') || 'Expected'}
                     </div>
-                    <div style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>
-                      {t('expectedBalance')}
+                    <div style={{ fontSize: '17px', fontWeight: '800', color: 'var(--navy-primary)' }}>
+                      {formatCurrency(account.expectedBalance)}
                     </div>
                   </div>
 
@@ -279,36 +326,39 @@ export default function BanksScreen({ user, onNavigate }) {
 
       {/* 5. Add Bank Account Modal */}
       {isAddModalOpen && (
-        <div
-          className="sheet-backdrop"
-          onClick={() => setIsAddModalOpen(false)}
-          style={{ zIndex: 100000 }}
-        >
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '16px',
+          backdropFilter: 'blur(2px)'
+        }}>
           <div
-            className="sheet-container"
-            onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '440px' }}
+            className="stitch-card"
+            style={{
+              width: '100%',
+              maxWidth: '400px',
+              padding: '24px',
+              borderRadius: '20px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px'
+            }}
           >
-            {/* Modal Header */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', paddingBottom: '8px', borderBottom: '1px solid #E2E8F0' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '800', color: '#1E293B', margin: 0 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)' }}>
                 {t('addBankAccount')}
-              </h3>
+              </div>
               <button
-                type="button"
                 onClick={() => setIsAddModalOpen(false)}
-                style={{
-                  background: '#F1F5F9',
-                  border: 'none',
-                  borderRadius: '50%',
-                  width: '36px',
-                  height: '36px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  color: '#475569'
-                }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
               >
                 <X size={20} />
               </button>
@@ -319,8 +369,7 @@ export default function BanksScreen({ user, onNavigate }) {
                 background: '#FEE2E2',
                 color: '#DC2626',
                 padding: '10px 14px',
-                borderRadius: '8px',
-                marginBottom: '14px',
+                borderRadius: '10px',
                 fontSize: '13px',
                 fontWeight: '600'
               }}>
@@ -328,78 +377,76 @@ export default function BanksScreen({ user, onNavigate }) {
               </div>
             )}
 
-            <form onSubmit={handleAddAccount} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleAddAccount} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px', display: 'block' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '6px' }}>
                   {t('bankName')} *
                 </label>
                 <input
                   type="text"
-                  placeholder={t('enterBankName')}
+                  placeholder={t('enterBankName') || 'e.g. SBI, HDFC, Indian Bank'}
                   value={newBankName}
                   onChange={(e) => setNewBankName(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '12px 14px',
+                    borderRadius: '12px',
+                    border: '1.5px solid var(--border-color)',
                     fontSize: '15px',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
+                    fontWeight: '600',
                     outline: 'none',
-                    background: '#FAFAFA'
+                    backgroundColor: 'var(--bg-input)',
+                    color: 'var(--text-main)'
                   }}
-                  required
                   autoFocus
                 />
               </div>
 
               <div>
-                <label style={{ fontSize: '13px', fontWeight: '700', color: '#1E293B', marginBottom: '6px', display: 'block' }}>
-                  {t('openingBalance')} (₹)
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  {t('openingBalance') || 'Opening Balance (₹)'}
                 </label>
                 <input
                   type="number"
-                  step="any"
-                  placeholder="0.00"
+                  placeholder="0"
                   value={newOpeningBalance}
                   onChange={(e) => setNewOpeningBalance(e.target.value)}
                   style={{
                     width: '100%',
                     padding: '12px 14px',
-                    fontSize: '16px',
-                    fontWeight: '700',
-                    borderRadius: '10px',
-                    border: '1.5px solid #CBD5E1',
+                    borderRadius: '12px',
+                    border: '1.5px solid var(--border-color)',
+                    fontSize: '15px',
+                    fontWeight: '600',
                     outline: 'none',
-                    background: '#FAFAFA'
+                    backgroundColor: 'var(--bg-input)',
+                    color: 'var(--text-main)'
                   }}
                 />
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                  {t('openingBalanceHelper') || 'Current actual balance in this account'}
+                </span>
               </div>
 
-              <button
-                type="submit"
-                disabled={addLoading}
-                className="btn-primary-navy"
-                style={{ marginTop: '8px', padding: '14px' }}
-              >
-                {addLoading ? 'Saving...' : (t('saveBankAccount') || 'Save Bank Account')}
-              </button>
+              <div style={{ display: 'flex', gap: '10px', marginTop: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(false)}
+                  className="btn-outline-navy"
+                  style={{ flex: 1 }}
+                >
+                  {t('cancel')}
+                </button>
 
-              <button
-                type="button"
-                onClick={() => setIsAddModalOpen(false)}
-                disabled={addLoading}
-                style={{
-                  background: 'transparent',
-                  border: 'none',
-                  color: '#64748B',
-                  fontSize: '14px',
-                  fontWeight: '700',
-                  padding: '8px',
-                  cursor: 'pointer'
-                }}
-              >
-                {t('cancel')}
-              </button>
+                <button
+                  type="submit"
+                  disabled={addLoading}
+                  className="btn-primary-navy"
+                  style={{ flex: 1 }}
+                >
+                  {addLoading ? (t('saving') || 'Saving...') : (t('save') || 'Save Account')}
+                </button>
+              </div>
             </form>
           </div>
         </div>
