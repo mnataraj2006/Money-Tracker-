@@ -549,6 +549,56 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
         ) : (
           /* Normal Mode Recent Transactions List */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {/* Bank Balances Compact Preview */}
+            {data?.bankAccounts && data.bankAccounts.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', letterSpacing: '0.6px', textTransform: 'uppercase' }}>
+                    {t('bankBalances')}
+                  </div>
+                  <button
+                    onClick={() => onNavigate('banks')}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--blue-navy)',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      cursor: 'pointer',
+                      padding: '2px 4px'
+                    }}
+                  >
+                    {t('viewBanks')} &rarr;
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  {data.bankAccounts.slice(0, 3).map((acc) => (
+                    <div
+                      key={acc.id}
+                      className="stitch-card"
+                      onClick={() => onNavigate('bank-account-details', { accountId: acc.id })}
+                      style={{
+                        padding: '12px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Landmark size={18} color="#1E293B" />
+                        <span style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>{acc.name}</span>
+                      </div>
+                      <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-main)' }}>
+                        {formatCurrency(acc.expectedBalance)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {!data?.recentTransactions || data.recentTransactions.length === 0 ? (
               /* Empty State */
               <div className="stitch-card" style={{ padding: '24px 16px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>

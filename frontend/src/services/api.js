@@ -69,6 +69,17 @@ export const transactionsAPI = {
   delete: (id) => request(`/transactions/${id}`, { method: 'DELETE' })
 };
 
+// BANK ACCOUNTS API
+export const bankAccountsAPI = {
+  getAll: () => request('/bank-accounts'),
+  getById: (id) => request(`/bank-accounts/${id}`),
+  create: (accountData) => request('/bank-accounts', { method: 'POST', body: JSON.stringify(accountData) }),
+  update: (id, accountData) => request(`/bank-accounts/${id}`, { method: 'PUT', body: JSON.stringify(accountData) }),
+  delete: (id) => request(`/bank-accounts/${id}`, { method: 'DELETE' }),
+  verifyBalance: (id, actualBalance) =>
+    request(`/bank-accounts/${id}/verify`, { method: 'POST', body: JSON.stringify({ actualBalance }) })
+};
+
 // CASH API
 export const cashAPI = {
   getExpected: (date) => request(`/cash/expected${date ? '?date=' + date : ''}`),

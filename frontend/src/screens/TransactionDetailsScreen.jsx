@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Edit, Trash2, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard } from 'lucide-react';
-import { transactionsAPI } from '../services/api';
+import { transactionsAPI, bankAccountsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
 
 export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
   const { clearCache } = useDataCache();
   const [tx, setTx] = useState(null);
+  const [bankName, setBankName] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -17,7 +18,19 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
     try {
       setLoading(true);
       const data = await transactionsAPI.getById(txId);
-      setTx(data.transaction);
+      const loadedTx = data.transaction;
+      setTx(loadedTx);
+
+      if (loadedTx && loadedTx.accountId && loadedTx.accountId !== 'CASH') {
+        try {
+          const bankData = await bankAccountsAPI.getById(loadedTx.accountId);
+          if (bankData?.bankAccount?.name) {
+            setBankName(bankData.bankAccount.name);
+          }
+        } catch (err) {
+          // ignore if bank not found
+        }
+      }
     } catch (err) {
       setError(err.message || 'Failed to load transaction');
     } finally {
@@ -110,7 +123,7 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           fontSize: '12px',
           fontWeight: '700'
         }}>
-          {tx.date} • {tx.paymentMethod}
+          {tx.date} • {tx.paymentMethod} {bankName ? `• ${bankName}` : ''}
         </div>
       </div>
 
@@ -123,11 +136,17 @@ export default function TransactionDetailsScreen({ txId, onBack, onNavigate }) {
           </span>
         </div>
 
-
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
           <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Payment Method</span>
           <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>{tx.paymentMethod}</span>
         </div>
+
+        {bankName && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
+            <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Bank Account</span>
+            <span style={{ color: 'var(--text-main)', fontSize: '13px', fontWeight: '700' }}>{bankName}</span>
+          </div>
+        )}
 
         <div style={{ display: 'flex', justifyContent: 'space-between', padding: '14px 0', borderBottom: '1px solid var(--border-color)' }}>
           <span style={{ color: 'var(--text-secondary)', fontSize: '13px', fontWeight: '600' }}>Date</span>

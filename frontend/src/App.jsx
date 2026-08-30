@@ -16,6 +16,8 @@ import MonthlySummaryScreen from './screens/MonthlySummaryScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import DailyDetailsScreen from './screens/DailyDetailsScreen';
 import SimplePassbookView from './screens/SimplePassbookView';
+import BanksScreen from './screens/BanksScreen';
+import BankAccountDetailsScreen from './screens/BankAccountDetailsScreen';
 import { authAPI, settingsAPI } from './services/api';
 import { LanguageProvider } from './context/LanguageContext';
 import { DataProvider } from './context/DataContext';
@@ -99,7 +101,7 @@ function AppContent() {
   const navigateTo = (screen, params = {}) => {
     setCurrentScreen(screen);
     setScreenParams(params);
-    if (['home', 'transactions', 'cash', 'history', 'settings'].includes(screen)) {
+    if (['home', 'transactions', 'banks', 'history', 'settings'].includes(screen)) {
       setActiveTab(screen);
     }
   };
@@ -117,7 +119,7 @@ function AppContent() {
     );
   }
 
-  const isMainTabScreen = user && ['home', 'transactions', 'cash', 'history', 'settings'].includes(currentScreen);
+  const isMainTabScreen = user && ['home', 'transactions', 'banks', 'history', 'settings'].includes(currentScreen);
 
   return (
     <div className="mobile-app-shell">
@@ -132,7 +134,7 @@ function AppContent() {
         >
           {currentScreen === 'home' && <HomeScreen user={user} onNavigate={navigateTo} viewMode={viewMode} />}
           {currentScreen === 'transactions' && <TransactionsScreen user={user} onNavigate={navigateTo} />}
-          {currentScreen === 'cash' && <CashAtHomeScreen user={user} onNavigate={navigateTo} />}
+          {currentScreen === 'banks' && <BanksScreen user={user} onNavigate={navigateTo} />}
           {currentScreen === 'history' && <HistoryScreen user={user} onNavigate={navigateTo} />}
           {currentScreen === 'settings' && (
             <SettingsScreen
@@ -146,6 +148,18 @@ function AppContent() {
         </AppShell>
       ) : (
         <>
+          {currentScreen === 'cash' && (
+            <CashAtHomeScreen user={user} onNavigate={navigateTo} onBack={() => navigateTo('home')} />
+          )}
+
+          {currentScreen === 'bank-account-details' && (
+            <BankAccountDetailsScreen
+              accountId={screenParams.accountId}
+              onBack={() => navigateTo('banks')}
+              onNavigate={navigateTo}
+            />
+          )}
+
           {currentScreen === 'add-income' && (
             <AddIncomeScreen
               initialDate={screenParams.date}

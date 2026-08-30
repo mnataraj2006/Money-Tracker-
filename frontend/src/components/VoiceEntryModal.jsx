@@ -586,8 +586,8 @@ export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialTyp
                   <label style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-secondary)', marginBottom: '6px', display: 'block' }}>
                     Payment Method (செலுத்தும் முறை) *
                   </label>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                    {['CASH', 'UPI', 'BANK', 'CARD'].map((pm) => (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
+                    {['CASH', 'UPI'].map((pm) => (
                       <button
                         key={pm}
                         type="button"
@@ -610,7 +610,7 @@ export default function VoiceEntryModal({ isOpen, onClose, onSuccess, initialTyp
                   </div>
                   {!paymentMethod && (
                     <div style={{ fontSize: '11px', color: '#D97706', marginTop: '4px', fontWeight: '600' }}>
-                      ⚠️ Please select Cash, UPI, Bank or Card
+                      ⚠️ Please select Cash or UPI
                     </div>
                   )}
                 </div>

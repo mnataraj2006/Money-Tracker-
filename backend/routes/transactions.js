@@ -1,14 +1,14 @@
 const express = require('express');
 const router = express.Router();
 const crypto = require('crypto');
-const { Transaction } = require('../db_mongo');
+const { Transaction, BankAccount } = require('../db_mongo');
 const { authenticateToken } = require('../middleware/auth');
 const { recalculateDailyClosingsFrom } = require('./cash');
 
 // GET ALL TRANSACTIONS WITH OPTIONAL PAGINATION AND FILTERS
 router.get('/', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-  const { date, type, category, search, month, page, limit } = req.query;
+  const { date, type, category, search, month, accountId, page, limit } = req.query;
 
   try {
     const query = { userId };
@@ -25,6 +25,10 @@ router.get('/', authenticateToken, async (req, res) => {
 
     if (category) {
       query.category = category;
+    }
+
+    if (accountId) {
+      query.accountId = accountId;
     }
 
     if (search) {
@@ -47,7 +51,7 @@ router.get('/', authenticateToken, async (req, res) => {
         .sort({ date: -1, createdAt: -1 })
         .skip(skip)
         .limit(limitNum)
-        .select('id type amount name transactionName category paymentMethod description date createdAt')
+        .select('id type amount name transactionName category paymentMethod accountId description date createdAt')
         .lean(),
       Transaction.countDocuments(query)
     ]);
@@ -86,7 +90,7 @@ router.get('/:id', authenticateToken, async (req, res) => {
 // CREATE TRANSACTION
 router.post('/', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-  const { type, amount, name, transactionName, category, paymentMethod, description, date } = req.body;
+  const { type, amount, name, transactionName, category, paymentMethod, accountId, description, date } = req.body;
 
   if (!type || !['INCOME', 'EXPENSE'].includes(type)) {
     return res.status(400).json({ error: 'Valid transaction type (INCOME or EXPENSE) is required' });
@@ -97,9 +101,24 @@ router.post('/', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Amount must be a positive number greater than 0' });
   }
 
-
   if (!paymentMethod || !['CASH', 'UPI', 'BANK', 'CARD', 'OTHER'].includes(paymentMethod)) {
     return res.status(400).json({ error: 'Valid payment method is required' });
+  }
+
+  let targetAccountId = null;
+  if (paymentMethod === 'CASH') {
+    targetAccountId = 'CASH';
+  } else if (paymentMethod === 'UPI') {
+    if (!accountId) {
+      return res.status(400).json({ error: 'Please select a bank account for UPI transaction' });
+    }
+    const bankAcc = await BankAccount.findOne({ id: accountId, userId });
+    if (!bankAcc) {
+      return res.status(400).json({ error: 'Selected bank account was not found' });
+    }
+    targetAccountId = accountId;
+  } else {
+    targetAccountId = accountId || null;
   }
 
   const txDate = date || new Date().toISOString().split('T')[0];
@@ -119,6 +138,7 @@ router.post('/', authenticateToken, async (req, res) => {
       name: cleanName,
       category: (category || '').trim(),
       paymentMethod,
+      accountId: targetAccountId,
       description: cleanDescription,
       date: txDate
     });
@@ -140,12 +160,29 @@ router.post('/', authenticateToken, async (req, res) => {
 router.put('/:id', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
   const { id } = req.params;
-  const { type, amount, name, transactionName, category, paymentMethod, description, date } = req.body;
+  const { type, amount, name, transactionName, category, paymentMethod, accountId, description, date } = req.body;
 
   try {
     const existing = await Transaction.findOne({ id, userId });
     if (!existing) {
       return res.status(404).json({ error: 'Transaction not found' });
+    }
+
+    const effectivePaymentMethod = paymentMethod || existing.paymentMethod;
+    if (effectivePaymentMethod === 'CASH') {
+      existing.accountId = 'CASH';
+    } else if (effectivePaymentMethod === 'UPI') {
+      const targetAccId = accountId !== undefined ? accountId : existing.accountId;
+      if (!targetAccId || targetAccId === 'CASH') {
+        return res.status(400).json({ error: 'Please select a bank account for UPI transaction' });
+      }
+      const bankAcc = await BankAccount.findOne({ id: targetAccId, userId });
+      if (!bankAcc) {
+        return res.status(400).json({ error: 'Selected bank account was not found' });
+      }
+      existing.accountId = targetAccId;
+    } else if (accountId !== undefined) {
+      existing.accountId = accountId;
     }
 
     const oldDate = existing.date;
@@ -176,7 +213,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
       transaction: existing
     });
   } catch (err) {
-    return res.status(500).json({ error: 'Failed to update transaction' });
+    return res.status(500).json({ error: err.message || 'Failed to update transaction' });
   }
 });
 

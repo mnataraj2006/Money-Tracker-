@@ -54,6 +54,7 @@ const transactionSchema = new mongoose.Schema({
   name: { type: String, default: '' },
   category: { type: String, default: '' },
   paymentMethod: { type: String, enum: ['CASH', 'UPI', 'BANK', 'CARD', 'OTHER'], required: true },
+  accountId: { type: String, default: null, index: true },
   description: { type: String, default: '' },
   date: { type: String, required: true, index: true }, // YYYY-MM-DD
   createdAt: { type: Date, default: Date.now },
@@ -69,6 +70,32 @@ transactionSchema.pre('save', function (next) {
 
 transactionSchema.index({ userId: 1, date: -1, createdAt: -1 });
 transactionSchema.index({ userId: 1, type: 1 });
+transactionSchema.index({ userId: 1, accountId: 1 });
+
+// Bank Account Schema
+const bankAccountSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  name: { type: String, required: true, trim: true },
+  openingBalance: { type: Number, default: 0 },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+bankAccountSchema.index({ userId: 1, name: 1 });
+
+// Account Balance Check (Verification) Schema
+const accountBalanceCheckSchema = new mongoose.Schema({
+  id: { type: String, required: true, unique: true },
+  userId: { type: String, required: true, index: true },
+  accountId: { type: String, required: true, index: true },
+  expectedBalance: { type: Number, required: true },
+  actualBalance: { type: Number, required: true },
+  difference: { type: Number, required: true },
+  checkedAt: { type: Date, default: Date.now }
+});
+
+accountBalanceCheckSchema.index({ userId: 1, accountId: 1, checkedAt: -1 });
 
 // Cash Count Schema
 const cashCountSchema = new mongoose.Schema({
@@ -119,6 +146,8 @@ const settingsSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', userSchema);
 const Transaction = mongoose.model('Transaction', transactionSchema);
+const BankAccount = mongoose.model('BankAccount', bankAccountSchema);
+const AccountBalanceCheck = mongoose.model('AccountBalanceCheck', accountBalanceCheckSchema);
 const CashCount = mongoose.model('CashCount', cashCountSchema);
 const DailyClosing = mongoose.model('DailyClosing', dailyClosingSchema);
 const Settings = mongoose.model('Settings', settingsSchema);
@@ -127,6 +156,8 @@ module.exports = {
   connectDB,
   User,
   Transaction,
+  BankAccount,
+  AccountBalanceCheck,
   CashCount,
   DailyClosing,
   Settings

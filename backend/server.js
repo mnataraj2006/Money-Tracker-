@@ -5,6 +5,7 @@ const { connectDB } = require('./db_mongo');
 
 const authRoutes = require('./routes/auth');
 const transactionRoutes = require('./routes/transactions');
+const bankAccountRoutes = require('./routes/bankAccounts');
 const cashRoutes = require('./routes/cash');
 const summaryRoutes = require('./routes/summary');
 const settingsRoutes = require('./routes/settings');
@@ -28,6 +29,7 @@ app.use(express.json());
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/bank-accounts', bankAccountRoutes);
 app.use('/api/cash', cashRoutes.router || cashRoutes);
 app.use('/api/summary', summaryRoutes);
 app.use('/api/settings', settingsRoutes);

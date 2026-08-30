@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Receipt, Banknote, History, Settings } from 'lucide-react';
+import { Home, Receipt, Landmark, History, Settings } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 export default function BottomNav({ activeTab, onTabChange }) {
@@ -8,7 +8,7 @@ export default function BottomNav({ activeTab, onTabChange }) {
   const tabs = [
     { id: 'home', labelKey: 'home', icon: Home },
     { id: 'transactions', labelKey: 'transactions', icon: Receipt },
-    { id: 'cash', labelKey: 'cash', icon: Banknote },
+    { id: 'banks', labelKey: 'banks', icon: Landmark },
     { id: 'history', labelKey: 'history', icon: History },
     { id: 'settings', labelKey: 'settings', icon: Settings },
   ];

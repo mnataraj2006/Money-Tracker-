@@ -3,6 +3,7 @@ const router = express.Router();
 const { User, Transaction, DailyClosing, CashCount } = require('../db_mongo');
 const { authenticateToken } = require('../middleware/auth');
 const CashCalculationService = require('../services/cashCalculationService');
+const BankAccountService = require('../services/bankAccountService');
 
 // 1. DASHBOARD SUMMARY — OPTIMIZED WITH MONGODB AGGREGATION & CASH SERVICE
 router.get('/dashboard', authenticateToken, async (req, res) => {
@@ -10,7 +11,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
   const today = req.query.date || new Date().toISOString().split('T')[0];
 
   try {
-    const [user, cashData, todayAgg, recentTransactions] = await Promise.all([
+    const [user, cashData, todayAgg, recentTransactions, bankAccounts] = await Promise.all([
       User.findOne({ id: userId }).select('id fullName email profileImage').lean(),
       CashCalculationService.getExpectedCash(userId, today),
       Transaction.aggregate([
@@ -24,8 +25,9 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       ]),
       Transaction.find({ userId, date: today })
         .sort({ createdAt: -1 })
-        .select('id type amount name transactionName category paymentMethod description date createdAt')
-        .lean()
+        .select('id type amount name transactionName category paymentMethod accountId description date createdAt')
+        .lean(),
+      BankAccountService.getAllAccountsSummary(userId)
     ]);
 
     if (!user) {
@@ -58,6 +60,7 @@ router.get('/dashboard', authenticateToken, async (req, res) => {
       hasCounted: cashData.hasCounted,
       counts: cashData.counts,
       isClosed: cashData.isClosed,
+      bankAccounts: bankAccounts || [],
       recentTransactions
     });
   } catch (err) {
