@@ -116,30 +116,30 @@ graph TD
 ```mermaid
 flowchart TD
     subgraph Client Layer
-        Web[Chrome / Desktop Browser]
-        Android[Android APK Capacitor 8]
+        Web["Chrome / Desktop Browser"]
+        Android["Android APK (Capacitor 8)"]
     end
 
     subgraph Application Services
-        AuthContext[Auth & Session Manager]
-        GoogleAuth[Capacitor / GIS OAuth]
-        SpeechService[Tamil/English Speech NLP]
-        PDFEngine[jsPDF + HTML Canvas Vector Engine]
-        DriveService[Google Drive Sync Service]
+        AuthContext["Auth & Session Manager"]
+        GoogleAuth["Capacitor / GIS OAuth"]
+        SpeechService["Tamil/English Speech NLP"]
+        PDFEngine["jsPDF + HTML Canvas Vector Engine"]
+        DriveService["Google Drive Sync Service"]
     end
 
-    subgraph Backend REST API Node Express
-        AuthRoutes[/api/auth]
-        TxRoutes[/api/transactions]
-        BankRoutes[/api/bank-accounts]
-        CashRoutes[/api/cash]
-        SummaryRoutes[/api/summary]
-        SettingsRoutes[/api/settings]
+    subgraph Backend REST API
+        AuthRoutes["/api/auth"]
+        TxRoutes["/api/transactions"]
+        BankRoutes["/api/bank-accounts"]
+        CashRoutes["/api/cash"]
+        SummaryRoutes["/api/summary"]
+        SettingsRoutes["/api/settings"]
     end
 
     subgraph Storage & Cloud
-        MongoDB[(MongoDB Atlas Mongoose)]
-        GDrive[(Google Drive appDataFolder)]
+        MongoDB[("MongoDB Atlas Database")]
+        GDrive[("Google Drive appDataFolder")]
     end
 
     Web --> AuthContext
