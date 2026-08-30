@@ -1,5 +1,8 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { Capacitor } from '@capacitor/core';
+import { Filesystem, Directory } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 
 /**
  * Format currency with Indian grouping (e.g. ₹1,23,456)
@@ -436,6 +439,41 @@ export async function generateDailyFinancialReport({ date, summaryData, user, la
 
   // 7. Save / Trigger Download
   const filename = `Cashly_Daily_Report_${date}.pdf`;
-  doc.save(filename);
-  return filename;
+
+  if (Capacitor.isNativePlatform()) {
+    try {
+      // Extract base64 from jsPDF output
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+
+      // Save file directly to device Documents folder
+      const savedFile = await Filesystem.writeFile({
+        path: filename,
+        data: pdfBase64,
+        directory: Directory.Documents,
+        recursive: true
+      });
+
+      // Prompt native Android Open/Share/Save dialog
+      try {
+        await Share.share({
+          title: `Cashly Daily Report (${date})`,
+          text: `Cashly Daily Financial Statement for ${date}`,
+          url: savedFile.uri,
+          dialogTitle: 'Save / Open PDF Report'
+        });
+      } catch (shareErr) {
+        console.log('Share sheet dismissed or closed:', shareErr);
+      }
+
+      return filename;
+    } catch (nativeErr) {
+      console.warn('Native Filesystem write error, falling back to doc.save:', nativeErr);
+      doc.save(filename);
+      return filename;
+    }
+  } else {
+    // Standard Desktop Browser Download
+    doc.save(filename);
+    return filename;
+  }
 }
