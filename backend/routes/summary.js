@@ -394,7 +394,7 @@ router.get('/range-report', authenticateToken, async (req, res) => {
   }
 
   try {
-    const [rangeTxs, closingRows, countRows, bankAccounts] = await Promise.all([
+    const [rangeTxs, closingRows, countRows, bankAccounts, initialCashData] = await Promise.all([
       Transaction.find({
         userId,
         date: { $gte: fromDate, $lte: toDate }
@@ -410,7 +410,8 @@ router.get('/range-report', authenticateToken, async (req, res) => {
         userId,
         date: { $gte: fromDate, $lte: toDate }
       }).sort({ createdAt: -1 }).lean(),
-      BankAccountService.getAllAccountsSummary(userId)
+      BankAccountService.getAllAccountsSummary(userId),
+      CashCalculationService.getExpectedCash(userId, fromDate)
     ]);
 
     const bankMap = {};
@@ -434,18 +435,76 @@ router.get('/range-report', authenticateToken, async (req, res) => {
     let upiIncome = 0;
     let upiExpense = 0;
 
+    const incomeByMethod = {};
+    const expenseByMethod = {};
+
+    let largestIncomeTx = null;
+    let largestExpenseTx = null;
+
+    // Per Bank Activity Map
+    const bankActivity = {};
+    (bankAccounts || []).forEach(b => {
+      bankActivity[b.id] = {
+        id: b.id,
+        name: b.name,
+        expectedBalance: b.expectedBalance || 0,
+        upiIncome: 0,
+        upiExpense: 0,
+        cashWithdrawals: 0
+      };
+    });
+
+    let incomeCount = 0;
+    let expenseCount = 0;
+    let cashTxCount = 0;
+    let upiTxCount = 0;
+
     enrichedTxs.forEach(t => {
       const amt = parseFloat(t.amount) || 0;
+      const method = t.paymentMethod || 'CASH';
+
+      if (method === 'CASH') cashTxCount++;
+      else upiTxCount++;
+
       if (t.type === 'INCOME') {
         totalIncome += amt;
-        if (t.paymentMethod === 'CASH') cashIncome += amt;
-        else upiIncome += amt;
+        incomeCount++;
+        incomeByMethod[method] = (incomeByMethod[method] || 0) + amt;
+
+        if (method === 'CASH') {
+          cashIncome += amt;
+        } else {
+          upiIncome += amt;
+          if (t.accountId && bankActivity[t.accountId]) {
+            bankActivity[t.accountId].upiIncome += amt;
+          }
+        }
+
+        if (!largestIncomeTx || amt > largestIncomeTx.amount) {
+          largestIncomeTx = { name: t.transactionName, amount: amt, date: t.date };
+        }
       } else if (t.type === 'EXPENSE') {
         totalExpense += amt;
-        if (t.paymentMethod === 'CASH') cashExpense += amt;
-        else upiExpense += amt;
+        expenseCount++;
+        expenseByMethod[method] = (expenseByMethod[method] || 0) + amt;
+
+        if (method === 'CASH') {
+          cashExpense += amt;
+        } else {
+          upiExpense += amt;
+          if (t.accountId && bankActivity[t.accountId]) {
+            bankActivity[t.accountId].upiExpense += amt;
+          }
+        }
+
+        if (!largestExpenseTx || amt > largestExpenseTx.amount) {
+          largestExpenseTx = { name: t.transactionName, amount: amt, date: t.date };
+        }
       } else if (t.type === 'CASH_WITHDRAWAL') {
         cashWithdrawal += amt;
+        if (t.accountId && bankActivity[t.accountId]) {
+          bankActivity[t.accountId].cashWithdrawals += amt;
+        }
       }
     });
 
@@ -453,35 +512,23 @@ router.get('/range-report', authenticateToken, async (req, res) => {
     const netCashChange = cashIncome - cashExpense + cashWithdrawal;
     const netUpiChange = upiIncome - upiExpense - cashWithdrawal;
 
-    // Group by Date
-    const daysMap = {};
-    enrichedTxs.forEach(t => {
-      if (!daysMap[t.date]) {
-        daysMap[t.date] = {
-          date: t.date,
-          income: 0,
-          expense: 0,
-          cashIncome: 0,
-          cashExpense: 0,
-          cashWithdrawal: 0,
-          net: 0,
-          transactions: []
-        };
-      }
-      const day = daysMap[t.date];
-      const amt = parseFloat(t.amount) || 0;
-      day.transactions.push(t);
-      if (t.type === 'INCOME') {
-        day.income += amt;
-        if (t.paymentMethod === 'CASH') day.cashIncome += amt;
-      } else if (t.type === 'EXPENSE') {
-        day.expense += amt;
-        if (t.paymentMethod === 'CASH') day.cashExpense += amt;
-      } else if (t.type === 'CASH_WITHDRAWAL') {
-        day.cashWithdrawal += amt;
-      }
-      day.net = day.income - day.expense;
-    });
+    const openingCash = initialCashData.previousDayCash || 0;
+    const closingCash = openingCash + netCashChange;
+
+    // Generate all calendar dates in range inclusive (YYYY-MM-DD)
+    const allDates = [];
+    const [startY, startM, startD] = fromDate.split('-').map(Number);
+    const [endY, endM, endD] = toDate.split('-').map(Number);
+    const cur = new Date(startY, startM - 1, startD);
+    const end = new Date(endY, endM - 1, endD);
+
+    while (cur <= end) {
+      const y = cur.getFullYear();
+      const m = String(cur.getMonth() + 1).padStart(2, '0');
+      const d = String(cur.getDate()).padStart(2, '0');
+      allDates.push(`${y}-${m}-${d}`);
+      cur.setDate(cur.getDate() + 1);
+    }
 
     // Map Closings / Counts
     const closingMap = {};
@@ -489,27 +536,74 @@ router.get('/range-report', authenticateToken, async (req, res) => {
     const countMap = {};
     countRows.forEach(c => { if (!countMap[c.date]) countMap[c.date] = c; });
 
-    const dailyBreakdown = Object.keys(daysMap)
-      .sort((a, b) => a.localeCompare(b))
-      .map(dateStr => {
-        const d = daysMap[dateStr];
-        const closing = closingMap[dateStr];
-        const count = countMap[dateStr];
-        return {
-          ...d,
-          isClosed: !!closing?.isClosed,
-          physicalCash: count ? count.physicalCash : (closing ? closing.physicalCash : null),
-          status: closing ? closing.status : (count ? 'COUNTED' : 'UNCHECKED')
-        };
+    // Group transactions by date
+    const txByDate = {};
+    enrichedTxs.forEach(t => {
+      if (!txByDate[t.date]) txByDate[t.date] = [];
+      txByDate[t.date].push(t);
+    });
+
+    let highestIncomeDay = null;
+    let highestExpenseDay = null;
+
+    const dailyBreakdown = allDates.map(dateStr => {
+      const dayTxs = txByDate[dateStr] || [];
+      let dayIncome = 0;
+      let dayExpense = 0;
+      let dayCashIncome = 0;
+      let dayCashExpense = 0;
+      let dayWithdrawal = 0;
+
+      dayTxs.forEach(t => {
+        const amt = parseFloat(t.amount) || 0;
+        if (t.type === 'INCOME') {
+          dayIncome += amt;
+          if (t.paymentMethod === 'CASH') dayCashIncome += amt;
+        } else if (t.type === 'EXPENSE') {
+          dayExpense += amt;
+          if (t.paymentMethod === 'CASH') dayCashExpense += amt;
+        } else if (t.type === 'CASH_WITHDRAWAL') {
+          dayWithdrawal += amt;
+        }
       });
+
+      const dayNet = dayIncome - dayExpense;
+
+      if (dayIncome > 0 && (!highestIncomeDay || dayIncome > highestIncomeDay.amount)) {
+        highestIncomeDay = { date: dateStr, amount: dayIncome };
+      }
+      if (dayExpense > 0 && (!highestExpenseDay || dayExpense > highestExpenseDay.amount)) {
+        highestExpenseDay = { date: dateStr, amount: dayExpense };
+      }
+
+      const closing = closingMap[dateStr];
+      const count = countMap[dateStr];
+
+      return {
+        date: dateStr,
+        income: dayIncome,
+        expense: dayExpense,
+        cashIncome: dayCashIncome,
+        cashExpense: dayCashExpense,
+        cashWithdrawal: dayWithdrawal,
+        net: dayNet,
+        isClosed: !!closing?.isClosed,
+        physicalCash: count ? count.physicalCash : (closing ? closing.physicalCash : null),
+        status: closing ? closing.status : (count ? 'COUNTED' : (dayTxs.length === 0 ? 'NO_ACTIVITY' : 'OPEN')),
+        transactions: dayTxs
+      };
+    });
 
     return res.json({
       fromDate,
       toDate,
-      daysCount: dailyBreakdown.length,
+      daysCount: allDates.length,
+      activeDaysCount: dailyBreakdown.filter(d => d.transactions.length > 0).length,
       totalIncome,
       totalExpense,
       netSavings,
+      openingCash,
+      closingCash,
       cashIncome,
       cashExpense,
       cashWithdrawal,
@@ -517,7 +611,22 @@ router.get('/range-report', authenticateToken, async (req, res) => {
       upiIncome,
       upiExpense,
       netUpiChange,
-      bankAccounts: bankAccounts || [],
+      bankAccounts: Object.values(bankActivity),
+      incomeByMethod,
+      expenseByMethod,
+      counts: {
+        totalTransactions: enrichedTxs.length,
+        incomeCount,
+        expenseCount,
+        cashTxCount,
+        upiTxCount
+      },
+      highlights: {
+        highestIncomeDay,
+        highestExpenseDay,
+        largestIncomeTx,
+        largestExpenseTx
+      },
       dailyBreakdown,
       transactions: enrichedTxs
     });

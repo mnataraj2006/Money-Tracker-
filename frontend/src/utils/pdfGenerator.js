@@ -46,6 +46,20 @@ function formatDateDisplay(dateStr, isTamil) {
   }
 }
 
+function formatShortDate(dateStr, isTamil) {
+  if (!dateStr) return '';
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    return dateObj.toLocaleDateString(isTamil ? 'ta-IN' : 'en-US', {
+      day: '2-digit',
+      month: 'short'
+    });
+  } catch (e) {
+    return dateStr;
+  }
+}
+
 /**
  * Save / Share PDF helper function
  */
@@ -101,7 +115,7 @@ async function renderElementToCanvas(container) {
 }
 
 /**
- * 1. SINGLE-DAY FINANCIAL REPORT PDF GENERATOR
+ * 1. SINGLE-DAY FINANCIAL REPORT PDF GENERATOR (STRICTLY ONE-PAGE)
  */
 export async function generateDailyFinancialReport({ date, summaryData, user, language = 'en' }) {
   const isTamil = language === 'ta';
@@ -217,7 +231,7 @@ export async function generateDailyFinancialReport({ date, summaryData, user, la
       const title = (tx.transactionName && tx.transactionName.trim())
         ? tx.transactionName.trim()
         : ((tx.name && tx.name.trim()) ? tx.name.trim() : (type === 'WITHDRAWAL' ? L.cashWithdrawalTx : L.unnamedTx));
-      const descHtml = tx.description ? `<span style="color: #64748B; font-size: 10px; margin-left: 4px;">(${tx.description})</span>` : '';
+      const descHtml = tx.description ? `<div style="color: #64748B; font-size: 9.5px; margin-top: 1px;">${tx.description}</div>` : '';
       const methodLabel = tx.paymentMethod === 'CASH' ? 'CASH' : 'UPI';
       const accountLabel = tx.paymentMethod === 'CASH' ? '—' : (tx.accountName || 'Bank');
       const isPos = type === 'INCOME' || type === 'WITHDRAWAL';
@@ -228,7 +242,10 @@ export async function generateDailyFinancialReport({ date, summaryData, user, la
       return `
         <tr style="background-color: ${bg}; border-bottom: 1px solid #F1F5F9;">
           <td style="padding: 4px 6px; font-size: 11px; color: #64748B; text-align: center;">${timeStr}</td>
-          <td style="padding: 4px 6px; font-size: 11.5px; font-weight: 700; color: #1E293B;">${title}${descHtml}</td>
+          <td style="padding: 4px 6px; font-size: 11.5px; font-weight: 700; color: #1E293B;">
+            ${title}
+            ${descHtml}
+          </td>
           <td style="padding: 4px 6px; font-size: 10px; font-weight: 800; text-align: center; color: ${tx.paymentMethod === 'CASH' ? '#15803D' : '#4338CA'};">${methodLabel}</td>
           <td style="padding: 4px 6px; font-size: 11px; color: #475569;">${accountLabel}</td>
           <td style="padding: 4px 6px; font-size: 11.5px; font-weight: 800; text-align: right; color: ${amtColor};">${amtText}</td>
@@ -240,14 +257,17 @@ export async function generateDailyFinancialReport({ date, summaryData, user, la
   const withdrawalRowsHtml = withdrawalTxs.map((tx, idx) => {
     const timeStr = formatTime(tx.createdAt || tx.date);
     const title = (tx.transactionName && tx.transactionName.trim()) ? tx.transactionName.trim() : L.cashWithdrawalTx;
-    const descHtml = tx.description ? `<span style="color: #64748B; font-size: 10px; margin-left: 4px;">(${tx.description})</span>` : '';
+    const descHtml = tx.description ? `<div style="color: #64748B; font-size: 9.5px; margin-top: 1px;">${tx.description}</div>` : '';
     const transferRoute = `${tx.accountName || 'Bank'} → CASH`;
     const amtText = '+' + formatCurrency(tx.amount);
     const bg = idx % 2 === 0 ? '#EEF2FF' : '#F5F3FF';
     return `
       <tr style="background-color: ${bg}; border-bottom: 1px solid #E0E7FF;">
         <td style="padding: 4px 6px; font-size: 11px; color: #4338CA; text-align: center;">${timeStr}</td>
-        <td style="padding: 4px 6px; font-size: 11.5px; font-weight: 700; color: #312E81;">${title}${descHtml}</td>
+        <td style="padding: 4px 6px; font-size: 11.5px; font-weight: 700; color: #312E81;">
+          ${title}
+          ${descHtml}
+        </td>
         <td style="padding: 4px 6px; font-size: 10px; font-weight: 800; text-align: center; color: #4338CA;">TRANSFER</td>
         <td style="padding: 4px 6px; font-size: 11px; font-weight: 700; color: #4338CA;">${transferRoute}</td>
         <td style="padding: 4px 6px; font-size: 11.5px; font-weight: 800; text-align: right; color: #4338CA;">${amtText}</td>
@@ -448,10 +468,25 @@ export async function generateDailyFinancialReport({ date, summaryData, user, la
 }
 
 /**
- * 2. DATE RANGE MULTI-DAY FINANCIAL REPORT PDF GENERATOR
- * Generates comprehensive Period Summary + Day-wise Summary Table + Day-wise Detailed Breakdowns
+ * 2. COMPREHENSIVE REDESIGNED DATE RANGE (MULTI-PAGE) FINANCIAL REPORT GENERATOR
  */
 export async function generateDateRangeFinancialReport({ fromDate, toDate, rangeData, user, language = 'en' }) {
+  // If From Date and To Date are the same, automatically use the existing Single-Day Daily Report
+  if (fromDate === toDate) {
+    return await generateDailyFinancialReport({
+      date: fromDate,
+      summaryData: {
+        ...rangeData,
+        income: rangeData.totalIncome,
+        expense: rangeData.totalExpense,
+        net: rangeData.netSavings,
+        expectedCash: rangeData.closingCash
+      },
+      user,
+      language
+    });
+  }
+
   const isTamil = language === 'ta';
   const fromFormatted = formatDateDisplay(fromDate, isTamil);
   const toFormatted = formatDateDisplay(toDate, isTamil);
@@ -460,6 +495,8 @@ export async function generateDateRangeFinancialReport({ fromDate, toDate, range
   const totalIncome = rangeData.totalIncome || 0;
   const totalExpense = rangeData.totalExpense || 0;
   const netSavings = rangeData.netSavings || (totalIncome - totalExpense);
+  const openingCash = rangeData.openingCash || 0;
+  const closingCash = rangeData.closingCash || (openingCash + (rangeData.netCashChange || 0));
   const cashIncome = rangeData.cashIncome || 0;
   const cashExpense = rangeData.cashExpense || 0;
   const cashWithdrawal = rangeData.cashWithdrawal || 0;
@@ -470,44 +507,77 @@ export async function generateDateRangeFinancialReport({ fromDate, toDate, range
 
   const bankAccounts = rangeData.bankAccounts || [];
   const totalBankBalance = bankAccounts.reduce((sum, b) => sum + (parseFloat(b.expectedBalance) || 0), 0);
+  const totalMoney = closingCash + totalBankBalance;
+
   const dailyBreakdown = rangeData.dailyBreakdown || [];
+  const txs = rangeData.transactions || [];
+  const counts = rangeData.counts || {
+    totalTransactions: txs.length,
+    incomeCount: txs.filter(t => t.type === 'INCOME').length,
+    expenseCount: txs.filter(t => t.type === 'EXPENSE').length,
+    cashTxCount: txs.filter(t => t.paymentMethod === 'CASH').length,
+    upiTxCount: txs.filter(t => t.paymentMethod !== 'CASH').length
+  };
+  const highlights = rangeData.highlights || {};
+
+  const incomeTxs = txs.filter(t => t.type === 'INCOME');
+  const expenseTxs = txs.filter(t => t.type === 'EXPENSE');
+  const withdrawalTxs = txs.filter(t => t.type === 'CASH_WITHDRAWAL');
 
   const L = {
     title: 'CASHLY',
-    subtitle: isTamil ? 'தேதி வரம்பு நிதி அறிக்கை' : 'Date Range Financial Statement',
-    periodSummary: isTamil ? 'கால சுருக்கம்' : 'PERIOD SUMMARY',
+    subtitle: isTamil ? 'நிதி வரம்பு அறிக்கை' : 'Financial Range Report',
+    period: isTamil ? 'காலம்:' : 'Period:',
+    days: isTamil ? 'நாட்கள்' : 'Days',
+    executiveSummary: isTamil ? 'செயல்முறை சுருக்கம்' : 'EXECUTIVE SUMMARY',
     totalIncome: isTamil ? 'மொத்த வரவு' : 'TOTAL INCOME',
     totalExpense: isTamil ? 'மொத்த செலவு' : 'TOTAL EXPENSE',
-    netSavings: isTamil ? 'நிகர சேமிப்பு' : 'NET SAVINGS',
-    cashFlow: isTamil ? 'ரொக்க இயக்கம்' : 'CASH FLOW MOVEMENT',
-    bankingFlow: isTamil ? 'வங்கி / UPI இயக்கம்' : 'BANK & UPI MOVEMENT',
-    dayWiseTable: isTamil ? 'நாள் வாரியான சுருக்கம்' : 'DAY-WISE CONSOLIDATED SUMMARY',
-    dayWiseDetails: isTamil ? 'நாள் வாரியான பரிவர்த்தனை விவரங்கள்' : 'DAY-WISE DETAILED TRANSACTIONS',
+    netChange: isTamil ? 'நிகர மாற்றம்' : 'NET CHANGE',
+    expectedCash: isTamil ? 'எதிர்பார்க்கப்படும் ரொக்கம்' : 'EXPECTED CASH',
+    cashActivity: isTamil ? 'ரொக்க இயக்கம் (CASH ACTIVITY)' : 'CASH ACTIVITY',
+    upiActivity: isTamil ? 'வங்கி / UPI இயக்கம் (BANK & UPI)' : 'UPI / BANK ACTIVITY',
+    openingCash: isTamil ? 'தொடக்க ரொக்கம்' : 'Opening Cash',
+    closingCash: isTamil ? 'முடிவு / எதிர்பார்க்கப்படும் ரொக்கம்' : 'Closing Expected Cash',
+    cashIncome: isTamil ? 'ரொக்க வரவு' : 'Cash Income',
+    cashExpense: isTamil ? 'ரொக்கச் செலவு' : 'Cash Expense',
+    atmWithdrawal: isTamil ? 'வங்கி ரொக்க எடுப்பு (ATM)' : 'ATM Cash Withdrawal',
+    netCashMovement: isTamil ? 'நிகர ரொக்க மாற்றம்' : 'Net Cash Movement',
+    upiIncome: isTamil ? 'UPI / வங்கி வரவு' : 'UPI / Bank Inflow',
+    upiExpense: isTamil ? 'UPI / வங்கி செலவு' : 'UPI / Bank Outflow',
+    atmDebited: isTamil ? 'ATM எடுப்பு கழிவு' : 'ATM Cash Debited',
+    netUpiMovement: isTamil ? 'நிகர வங்கி மாற்றம்' : 'Net UPI / Bank Movement',
+    statsSummary: isTamil ? 'பரிவர்த்தனை புள்ளிவிவரங்கள்' : 'TRANSACTION STATISTICS',
+    totalTxs: isTamil ? 'மொத்த பரிவர்த்தனைகள்' : 'Total Transactions',
+    incomeTxs: isTamil ? 'வரவு பதிவுகள்' : 'Income Records',
+    expenseTxs: isTamil ? 'செலவு பதிவுகள்' : 'Expense Records',
+    cashTxs: isTamil ? 'ரொக்கப் பதிவுகள்' : 'Cash Records',
+    upiTxs: isTamil ? 'UPI பதிவுகள்' : 'UPI Records',
+    periodHighlights: isTamil ? 'காலத்தின் சிறப்பம்சங்கள்' : 'PERIOD HIGHLIGHTS',
+    highestIncomeDay: isTamil ? 'அதிக வரவு பெற்ற நாள்' : 'Highest Income Day',
+    highestExpenseDay: isTamil ? 'அதிக செலவு செய்த நாள்' : 'Highest Expense Day',
+    largestIncome: isTamil ? 'மிகப்பெரிய ஒற்றை வரவு' : 'Largest Single Income',
+    largestExpense: isTamil ? 'மிகப்பெரிய ஒற்றை செலவு' : 'Largest Single Expense',
+    bankSummary: isTamil ? 'வங்கி கணக்கு விவரங்கள்' : 'BANK ACCOUNT ACTIVITY',
+    dayWiseSummary: isTamil ? 'நாள் வாரியான நிதி சுருக்கம்' : 'DAY-BY-DAY SUMMARY',
+    dailyCashMovement: isTamil ? 'தினசரி ரொக்க இயக்கம்' : 'DAILY CASH MOVEMENTS',
+    detailedTransactions: isTamil ? 'விரிவான பரிவர்த்தனை பட்டியல்' : 'DETAILED TRANSACTIONS',
+    incomeTransactions: isTamil ? 'வரவு பரிவர்த்தனைகள்' : 'INCOME TRANSACTIONS',
+    expenseTransactions: isTamil ? 'செலவு பரிவர்த்தனைகள்' : 'EXPENSE TRANSACTIONS',
+    cashWithdrawals: isTamil ? 'ரொக்க எடுப்புகள் (வங்கி -> ரொக்கம்)' : 'CASH WITHDRAWALS (Bank -> Cash)',
+    financialSummary: isTamil ? 'இறுதி நிதிச் சுருக்கம்' : 'FINANCIAL SUMMARY',
+    totalMoney: isTamil ? 'மொத்த பணம்' : 'TOTAL MONEY',
+    noActivityPeriod: isTamil ? 'இந்த காலத்திற்கு பரிவர்த்தனைகள் எதுவும் இல்லை' : 'No transactions recorded for this period',
     date: isTamil ? 'தேதி' : 'Date',
     income: isTamil ? 'வரவு' : 'Income',
     expense: isTamil ? 'செலவு' : 'Expense',
-    withdrawals: isTamil ? 'ரொக்க எடுப்பு' : 'ATM Withdrawal',
-    net: isTamil ? 'நிகர தொகை' : 'Net',
-    status: isTamil ? 'நிலை' : 'Status',
-    time: isTamil ? 'நேரம்' : 'Time',
-    txName: isTamil ? 'பரிவர்த்தனை' : 'Transaction',
-    method: isTamil ? 'முறை' : 'Method',
-    account: isTamil ? 'கணக்கு' : 'Account',
-    amount: isTamil ? 'தொகை' : 'Amount',
-    type: isTamil ? 'வகை' : 'Type',
-    transfer: isTamil ? 'பரிமாற்றம்' : 'Transfer',
-    finalPosition: isTamil ? 'இறுதி இருப்பு நிலை' : 'FINAL POSITION',
-    cash: isTamil ? 'ரொக்கம்' : 'Cash',
-    bank: isTamil ? 'வங்கி' : 'Bank',
-    totalMoney: isTamil ? 'மொத்த பணம்' : 'TOTAL MONEY',
+    net: isTamil ? 'நிகரம்' : 'Net',
     generatedBy: isTamil ? 'Cashly மூலம் உருவாக்கப்பட்டது' : 'Generated by Cashly',
-    totalDays: isTamil ? 'மொத்த நாட்கள்' : 'Total Days',
-    totalRecords: isTamil ? 'பரிவர்த்தனைகள்' : 'Transactions',
-    noActivity: isTamil ? 'இந்த காலத்திற்கு பரிவர்த்தனைகள் எதுவும் இல்லை' : 'No transactions recorded for this period'
+    unnamedTx: isTamil ? 'பெயரிடப்படாத பரிவர்த்தனை' : 'Unnamed Transaction',
+    description: isTamil ? 'விவரம்:' : 'Description:'
   };
 
   // Helper to create standard page container
-  const createPageContainer = (pageNum, totalPagesEst = '') => {
+  const createPageContainer = () => {
     const page = document.createElement('div');
     page.style.position = 'fixed';
     page.style.top = '-9999px';
@@ -527,36 +597,75 @@ export async function generateDateRangeFinancialReport({ fromDate, toDate, range
     return page;
   };
 
+  // Header Component for Pages 2+
+  const renderSubPageHeader = (subtitleText) => `
+    <div style="background-color: #1E293B; border-radius: 8px; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; color: #FFFFFF; margin-bottom: 12px;">
+      <div>
+        <div style="font-size: 15px; font-weight: 900; letter-spacing: 0.5px;">${L.title}</div>
+        <div style="font-size: 11px; color: #CBD5E1; font-weight: 600;">${subtitleText || L.subtitle}</div>
+      </div>
+      <div style="text-align: right; font-size: 11.5px; font-weight: 800; color: #FFFFFF;">
+        ${periodTitle}
+      </div>
+    </div>
+  `;
+
   const pagesCanvases = [];
 
-  // ================= PAGE 1: PERIOD SUMMARY & DAY-WISE SUMMARY TABLE =================
-  const page1 = createPageContainer(1);
+  // =========================================================================
+  // PAGE 1: EXECUTIVE SUMMARY & PERIOD OVERVIEW
+  // =========================================================================
+  const page1 = createPageContainer();
 
-  // Day-wise Summary Table Rows
-  const daySummaryRowsHtml = dailyBreakdown.length === 0
-    ? `<tr><td colspan="6" style="text-align: center; padding: 12px; color: #94A3B8; font-style: italic;">${L.noActivity}</td></tr>`
-    : dailyBreakdown.map((d, idx) => {
-        const dFormatted = formatDateDisplay(d.date, isTamil);
-        const bg = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
-        const netColor = d.net >= 0 ? '#15803D' : '#DC2626';
-        const statusBadge = d.isClosed
-          ? '<span style="color: #15803D; font-weight: 800;">✓ CLOSED</span>'
-          : (d.physicalCash !== null ? '<span style="color: #4338CA; font-weight: 800;">COUNTED</span>' : '<span style="color: #94A3B8;">OPEN</span>');
+  // Bank Rows HTML
+  const bankRowsHtml = bankAccounts.length === 0
+    ? `<div style="font-size: 11px; color: #64748B; font-style: italic;">No bank accounts configured</div>`
+    : bankAccounts.map(b => `
+        <div style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; padding: 3px 0; border-bottom: 1px solid #F1F5F9;">
+          <div>
+            <strong style="color: #0F172A;">${b.name}</strong>
+            <span style="color: #64748B; font-size: 10px; margin-left: 6px;">(In: +${formatCurrency(b.upiIncome || 0)} | Out: -${formatCurrency(b.upiExpense || 0)}${b.cashWithdrawals ? ` | ATM: -${formatCurrency(b.cashWithdrawals)}` : ''})</span>
+          </div>
+          <span style="font-weight: 800; color: #1E293B;">${formatCurrency(b.expectedBalance)}</span>
+        </div>
+      `).join('');
 
-        return `
-          <tr style="background-color: ${bg}; border-bottom: 1px solid #E2E8F0;">
-            <td style="padding: 6px 8px; font-weight: 700; color: #1E293B;">${dFormatted}</td>
-            <td style="padding: 6px 8px; text-align: right; color: #15803D; font-weight: 700;">+${formatCurrency(d.income)}</td>
-            <td style="padding: 6px 8px; text-align: right; color: #DC2626; font-weight: 700;">-${formatCurrency(d.expense)}</td>
-            <td style="padding: 6px 8px; text-align: right; color: #4338CA; font-weight: 700;">+${formatCurrency(d.cashWithdrawal)}</td>
-            <td style="padding: 6px 8px; text-align: right; font-weight: 800; color: ${netColor};">${d.net >= 0 ? '+' : '-'}${formatCurrency(d.net)}</td>
-            <td style="padding: 6px 8px; text-align: center; font-size: 10px;">${statusBadge}</td>
-          </tr>
-        `;
-      }).join('');
+  // Highlights HTML
+  const hasHighlights = highlights.highestIncomeDay || highlights.highestExpenseDay || highlights.largestIncomeTx || highlights.largestExpenseTx;
+  const highlightsHtml = hasHighlights ? `
+    <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px;">
+      <div style="font-size: 11px; font-weight: 800; color: #1E293B; margin-bottom: 6px; text-transform: uppercase;">${L.periodHighlights}</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 11px;">
+        ${highlights.highestIncomeDay ? `
+          <div>
+            <div style="color: #64748B; font-size: 10px;">${L.highestIncomeDay}</div>
+            <strong style="color: #15803D;">${formatShortDate(highlights.highestIncomeDay.date, isTamil)} — ${formatCurrency(highlights.highestIncomeDay.amount)}</strong>
+          </div>
+        ` : ''}
+        ${highlights.highestExpenseDay ? `
+          <div>
+            <div style="color: #64748B; font-size: 10px;">${L.highestExpenseDay}</div>
+            <strong style="color: #DC2626;">${formatShortDate(highlights.highestExpenseDay.date, isTamil)} — ${formatCurrency(highlights.highestExpenseDay.amount)}</strong>
+          </div>
+        ` : ''}
+        ${highlights.largestIncomeTx ? `
+          <div>
+            <div style="color: #64748B; font-size: 10px;">${L.largestIncome}</div>
+            <strong style="color: #15803D;">${highlights.largestIncomeTx.name} — ${formatCurrency(highlights.largestIncomeTx.amount)}</strong>
+          </div>
+        ` : ''}
+        ${highlights.largestExpenseTx ? `
+          <div>
+            <div style="color: #64748B; font-size: 10px;">${L.largestExpense}</div>
+            <strong style="color: #DC2626;">${highlights.largestExpenseTx.name} — ${formatCurrency(highlights.largestExpenseTx.amount)}</strong>
+          </div>
+        ` : ''}
+      </div>
+    </div>
+  ` : '';
 
   page1.innerHTML = `
-    <div style="display: flex; flex-direction: column; gap: 12px;">
+    <div style="display: flex; flex-direction: column; gap: 10px;">
       <!-- 1. HEADER -->
       <div style="background-color: #1E293B; border-radius: 8px; padding: 12px 18px; display: flex; justify-content: space-between; align-items: center; color: #FFFFFF;">
         <div>
@@ -565,123 +674,136 @@ export async function generateDateRangeFinancialReport({ fromDate, toDate, range
         </div>
         <div style="text-align: right;">
           <div style="font-size: 13.5px; font-weight: 800; color: #FFFFFF;">${periodTitle}</div>
-          <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">${dailyBreakdown.length} ${L.totalDays} • ${rangeData.transactions?.length || 0} ${L.totalRecords}</div>
+          <div style="font-size: 11px; color: #94A3B8; margin-top: 2px;">${rangeData.daysCount || dailyBreakdown.length} ${L.days} (${fromFormatted} → ${toFormatted})</div>
         </div>
       </div>
 
-      <!-- 2. PERIOD TOTALS -->
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px;">
-        <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 10px 12px; text-align: center;">
-          <div style="font-size: 10.5px; font-weight: 800; color: #166534; text-transform: uppercase;">${L.totalIncome}</div>
-          <div style="font-size: 18px; font-weight: 900; color: #15803D; margin-top: 2px;">${formatCurrency(totalIncome)}</div>
+      <!-- 2. FOUR MAJOR METRIC CARDS -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px;">
+        <div style="background-color: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 8px 10px; text-align: center;">
+          <div style="font-size: 10px; font-weight: 800; color: #166534; text-transform: uppercase;">${L.totalIncome}</div>
+          <div style="font-size: 16px; font-weight: 900; color: #15803D; margin-top: 2px;">${formatCurrency(totalIncome)}</div>
         </div>
-        <div style="background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 10px 12px; text-align: center;">
-          <div style="font-size: 10.5px; font-weight: 800; color: #991B1B; text-transform: uppercase;">${L.totalExpense}</div>
-          <div style="font-size: 18px; font-weight: 900; color: #DC2626; margin-top: 2px;">${formatCurrency(totalExpense)}</div>
+        <div style="background-color: #FEF2F2; border: 1px solid #FECACA; border-radius: 8px; padding: 8px 10px; text-align: center;">
+          <div style="font-size: 10px; font-weight: 800; color: #991B1B; text-transform: uppercase;">${L.totalExpense}</div>
+          <div style="font-size: 16px; font-weight: 900; color: #DC2626; margin-top: 2px;">${formatCurrency(totalExpense)}</div>
         </div>
-        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; text-align: center;">
-          <div style="font-size: 10.5px; font-weight: 800; color: #1E293B; text-transform: uppercase;">${L.netSavings}</div>
-          <div style="font-size: 18px; font-weight: 900; color: ${netSavings >= 0 ? '#15803D' : '#DC2626'}; margin-top: 2px;">
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 10px; text-align: center;">
+          <div style="font-size: 10px; font-weight: 800; color: #1E293B; text-transform: uppercase;">${L.netChange}</div>
+          <div style="font-size: 16px; font-weight: 900; color: ${netSavings >= 0 ? '#15803D' : '#DC2626'}; margin-top: 2px;">
             ${netSavings >= 0 ? '+' : '-'}${formatCurrency(netSavings)}
           </div>
         </div>
+        <div style="background-color: #EEF2FF; border: 1px solid #C7D2FE; border-radius: 8px; padding: 8px 10px; text-align: center;">
+          <div style="font-size: 10px; font-weight: 800; color: #3730A3; text-transform: uppercase;">${L.expectedCash}</div>
+          <div style="font-size: 16px; font-weight: 900; color: #4338CA; margin-top: 2px;">${formatCurrency(closingCash)}</div>
+        </div>
       </div>
 
-      <!-- 3. CASH & BANKING MOVEMENT -->
+      <!-- 3. CASH VS UPI ACTIVITY (SIDE BY SIDE) -->
       <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-        <!-- Left: Cash Movement -->
+        <!-- Left: Cash Activity -->
         <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; font-size: 11.5px;">
-          <div style="font-size: 11.5px; font-weight: 800; color: #1E293B; margin-bottom: 6px; text-transform: uppercase;">${L.cashFlow}</div>
+          <div style="font-size: 11.5px; font-weight: 800; color: #1E293B; margin-bottom: 6px; text-transform: uppercase;">${L.cashActivity}</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #475569;">
+            <span>${L.openingCash}:</span>
+            <span style="font-weight: 700; color: #0F172A;">${formatCurrency(openingCash)}</span>
+          </div>
           <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #166534;">
-            <span>+ Cash Income:</span>
+            <span>+ ${L.cashIncome}:</span>
             <span style="font-weight: 700;">+${formatCurrency(cashIncome)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #4338CA;">
-            <span>+ ATM Withdrawals:</span>
+            <span>+ ${L.atmWithdrawal}:</span>
             <span style="font-weight: 700;">+${formatCurrency(cashWithdrawal)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #991B1B;">
-            <span>- Cash Expenses:</span>
+            <span>- ${L.cashExpense}:</span>
             <span style="font-weight: 700;">-${formatCurrency(cashExpense)}</span>
           </div>
           <div style="border-top: 1.5px solid #CBD5E1; padding-top: 4px; display: flex; justify-content: space-between; font-weight: 800; color: #1E293B; font-size: 12px;">
-            <span>Net Cash Movement:</span>
-            <span style="color: ${netCashChange >= 0 ? '#15803D' : '#DC2626'};">${netCashChange >= 0 ? '+' : '-'}${formatCurrency(netCashChange)}</span>
+            <span>${L.closingCash}:</span>
+            <span>${formatCurrency(closingCash)}</span>
           </div>
         </div>
 
-        <!-- Right: Banking & UPI Movement -->
+        <!-- Right: UPI / Bank Activity -->
         <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px; font-size: 11.5px;">
-          <div style="font-size: 11.5px; font-weight: 800; color: #1E293B; margin-bottom: 6px; text-transform: uppercase;">${L.bankingFlow}</div>
+          <div style="font-size: 11.5px; font-weight: 800; color: #1E293B; margin-bottom: 6px; text-transform: uppercase;">${L.upiActivity}</div>
           <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #166534;">
-            <span>+ UPI / Bank Inflow:</span>
+            <span>+ ${L.upiIncome}:</span>
             <span style="font-weight: 700;">+${formatCurrency(upiIncome)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #991B1B;">
-            <span>- UPI / Bank Outflow:</span>
+            <span>- ${L.upiExpense}:</span>
             <span style="font-weight: 700;">-${formatCurrency(upiExpense)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #4338CA;">
-            <span>- ATM Cash Debited:</span>
+            <span>- ${L.atmDebited}:</span>
             <span style="font-weight: 700;">-${formatCurrency(cashWithdrawal)}</span>
           </div>
           <div style="border-top: 1.5px solid #CBD5E1; padding-top: 4px; display: flex; justify-content: space-between; font-weight: 800; color: #1E293B; font-size: 12px;">
-            <span>Total Bank Balance:</span>
-            <span>${formatCurrency(totalBankBalance)}</span>
+            <span>${L.netUpiMovement}:</span>
+            <span style="color: ${netUpiChange >= 0 ? '#15803D' : '#DC2626'};">${netUpiChange >= 0 ? '+' : '-'}${formatCurrency(netUpiChange)}</span>
           </div>
         </div>
       </div>
 
-      <!-- 4. DAY-WISE SUMMARY TABLE -->
-      <div style="margin-top: 4px;">
-        <div style="font-size: 12.5px; font-weight: 800; color: #1E293B; text-transform: uppercase; border-bottom: 1.5px solid #E2E8F0; padding-bottom: 4px; margin-bottom: 6px;">
-          ${L.dayWiseTable}
+      <!-- 4. TRANSACTION COUNTS & STATISTICS -->
+      <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 12px;">
+        <div style="font-size: 11px; font-weight: 800; color: #1E293B; margin-bottom: 4px; text-transform: uppercase;">${L.statsSummary}</div>
+        <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; text-align: center; font-size: 11px;">
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px;">
+            <div style="color: #64748B; font-size: 9.5px;">${L.totalTxs}</div>
+            <strong style="color: #0F172A; font-size: 13px;">${counts.totalTransactions || 0}</strong>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px;">
+            <div style="color: #166534; font-size: 9.5px;">${L.incomeTxs}</div>
+            <strong style="color: #15803D; font-size: 13px;">${counts.incomeCount || 0}</strong>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px;">
+            <div style="color: #991B1B; font-size: 9.5px;">${L.expenseTxs}</div>
+            <strong style="color: #DC2626; font-size: 13px;">${counts.expenseCount || 0}</strong>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px;">
+            <div style="color: #475569; font-size: 9.5px;">${L.cashTxs}</div>
+            <strong style="color: #0F172A; font-size: 13px;">${counts.cashTxCount || 0}</strong>
+          </div>
+          <div style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 6px; padding: 4px;">
+            <div style="color: #4338CA; font-size: 9.5px;">${L.upiTxs}</div>
+            <strong style="color: #4338CA; font-size: 13px;">${counts.upiTxCount || 0}</strong>
+          </div>
         </div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
-          <thead>
-            <tr style="background-color: #1E293B; color: #FFFFFF;">
-              <th style="padding: 6px 8px; text-align: left;">${L.date}</th>
-              <th style="padding: 6px 8px; text-align: right;">${L.income}</th>
-              <th style="padding: 6px 8px; text-align: right;">${L.expense}</th>
-              <th style="padding: 6px 8px; text-align: right;">${L.withdrawals}</th>
-              <th style="padding: 6px 8px; text-align: right;">${L.net}</th>
-              <th style="padding: 6px 8px; text-align: center;">${L.status}</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${daySummaryRowsHtml}
-          </tbody>
-          <tfoot>
-            <tr style="background-color: #F1F5F9; font-weight: 800; color: #0F172A; border-top: 2px solid #CBD5E1;">
-              <td style="padding: 6px 8px;">Total (${dailyBreakdown.length} Days)</td>
-              <td style="padding: 6px 8px; text-align: right; color: #15803D;">+${formatCurrency(totalIncome)}</td>
-              <td style="padding: 6px 8px; text-align: right; color: #DC2626;">-${formatCurrency(totalExpense)}</td>
-              <td style="padding: 6px 8px; text-align: right; color: #4338CA;">+${formatCurrency(cashWithdrawal)}</td>
-              <td style="padding: 6px 8px; text-align: right; color: ${netSavings >= 0 ? '#15803D' : '#DC2626'};">${netSavings >= 0 ? '+' : '-'}${formatCurrency(netSavings)}</td>
-              <td style="padding: 6px 8px; text-align: center;">—</td>
-            </tr>
-          </tfoot>
-        </table>
+      </div>
+
+      <!-- 5. PERIOD HIGHLIGHTS -->
+      ${highlightsHtml}
+
+      <!-- 6. BANK ACCOUNT ACTIVITY -->
+      <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 10px 12px;">
+        <div style="font-size: 11px; font-weight: 800; color: #1E293B; margin-bottom: 4px; text-transform: uppercase;">${L.bankSummary}</div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          ${bankRowsHtml}
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: 800; font-size: 12px; margin-top: 6px; border-top: 1.5px solid #CBD5E1; padding-top: 4px;">
+          <span>Total Bank Balances:</span>
+          <span>${formatCurrency(totalBankBalance)}</span>
+        </div>
       </div>
     </div>
 
-    <!-- 5. FOOTER -->
-    <div style="margin-top: 12px;">
-      <div style="background-color: #1E293B; border-radius: 8px; padding: 10px 16px; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <div style="font-size: 11px; font-weight: 800; color: #94A3B8; text-transform: uppercase;">PERIOD NET POSITION</div>
-          <div style="font-size: 12px; color: #CBD5E1; margin-top: 2px;">
-            Net Cash: <strong style="color: #FFFFFF;">${formatCurrency(netCashChange)}</strong> &nbsp;|&nbsp; 
-            Total Bank Balance: <strong style="color: #FFFFFF;">${formatCurrency(totalBankBalance)}</strong>
-          </div>
+    <!-- 7. PAGE 1 FOOTER -->
+    <div style="margin-top: 10px;">
+      <div style="background-color: #1E293B; border-radius: 8px; padding: 8px 14px; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center;">
+        <div style="font-size: 11.5px;">
+          Cash: <strong style="color: #FFFFFF;">${formatCurrency(closingCash)}</strong> &nbsp;|&nbsp; 
+          Bank: <strong style="color: #FFFFFF;">${formatCurrency(totalBankBalance)}</strong>
         </div>
-        <div style="text-align: right;">
-          <div style="font-size: 11px; font-weight: 800; color: #94A3B8; text-transform: uppercase;">TOTAL SAVINGS</div>
-          <div style="font-size: 18px; font-weight: 900; color: #FFFFFF; margin-top: 1px;">${netSavings >= 0 ? '+' : '-'}${formatCurrency(netSavings)}</div>
+        <div style="font-size: 14px; font-weight: 900; color: #FFFFFF;">
+          ${L.totalMoney}: ${formatCurrency(totalMoney)}
         </div>
       </div>
-
-      <div style="text-align: center; font-size: 9.5px; color: #94A3B8; margin-top: 8px;">
+      <div style="text-align: center; font-size: 9px; color: #94A3B8; margin-top: 6px;">
         ${L.generatedBy} • ${new Date().toLocaleString(isTamil ? 'ta-IN' : 'en-IN')}
       </div>
     </div>
@@ -689,128 +811,291 @@ export async function generateDateRangeFinancialReport({ fromDate, toDate, range
 
   pagesCanvases.push(await renderElementToCanvas(page1));
 
-  // ================= PAGE 2+: DAY-WISE DETAILED TRANSACTIONS =================
-  // Split days into manageable pages (e.g. 2-3 days per page depending on transaction volume)
-  if (dailyBreakdown.length > 0) {
-    const daysWithTxs = dailyBreakdown.filter(d => (d.transactions && d.transactions.length > 0));
+  // =========================================================================
+  // PAGE 2: DAY-BY-DAY SUMMARY & DAILY CASH MOVEMENTS
+  // =========================================================================
+  const page2 = createPageContainer();
+
+  const daySummaryRowsHtml = dailyBreakdown.map((d, idx) => {
+    const dFormatted = formatDateDisplay(d.date, isTamil);
+    const bg = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
+    const netColor = d.net > 0 ? '#15803D' : (d.net < 0 ? '#DC2626' : '#64748B');
+    const netSign = d.net > 0 ? '+' : (d.net < 0 ? '-' : '');
+
+    return `
+      <tr style="background-color: ${bg}; border-bottom: 1px solid #E2E8F0;">
+        <td style="padding: 4px 6px; font-weight: 700; color: #1E293B; font-size: 10.5px;">${dFormatted}</td>
+        <td style="padding: 4px 6px; text-align: right; color: ${d.income > 0 ? '#15803D' : '#64748B'}; font-weight: 700; font-size: 10.5px;">
+          ${d.income > 0 ? '+' : ''}${formatCurrency(d.income)}
+        </td>
+        <td style="padding: 4px 6px; text-align: right; color: ${d.expense > 0 ? '#DC2626' : '#64748B'}; font-weight: 700; font-size: 10.5px;">
+          ${d.expense > 0 ? '-' : ''}${formatCurrency(d.expense)}
+        </td>
+        <td style="padding: 4px 6px; text-align: right; color: ${d.cashWithdrawal > 0 ? '#4338CA' : '#64748B'}; font-weight: 700; font-size: 10.5px;">
+          ${d.cashWithdrawal > 0 ? '+' : ''}${formatCurrency(d.cashWithdrawal)}
+        </td>
+        <td style="padding: 4px 6px; text-align: right; font-weight: 800; color: ${netColor}; font-size: 10.5px;">
+          ${netSign}${formatCurrency(d.net)}
+        </td>
+      </tr>
+    `;
+  }).join('');
+
+  // Daily Cash Movement Rows (days with cash transactions or withdrawals)
+  const activeCashDays = dailyBreakdown.filter(d => (d.cashIncome > 0 || d.cashExpense > 0 || d.cashWithdrawal > 0));
+  const cashMovementRowsHtml = activeCashDays.length === 0
+    ? `<div style="font-size: 11px; color: #64748B; font-style: italic; padding: 6px;">No physical cash activity recorded during this period</div>`
+    : activeCashDays.slice(0, 12).map(d => `
+        <div style="display: flex; justify-content: space-between; font-size: 10.5px; padding: 2px 0; border-bottom: 1px solid #F1F5F9;">
+          <span style="font-weight: 700; color: #1E293B;">${formatShortDate(d.date, isTamil)}</span>
+          <span>Cash In: <strong style="color: #15803D;">+${formatCurrency(d.cashIncome)}</strong></span>
+          <span>ATM: <strong style="color: #4338CA;">+${formatCurrency(d.cashWithdrawal)}</strong></span>
+          <span>Cash Out: <strong style="color: #DC2626;">-${formatCurrency(d.cashExpense)}</strong></span>
+          <span>Net: <strong style="color: ${(d.cashIncome + d.cashWithdrawal - d.cashExpense) >= 0 ? '#15803D' : '#DC2626'};">${(d.cashIncome + d.cashWithdrawal - d.cashExpense) >= 0 ? '+' : '-'}${formatCurrency(d.cashIncome + d.cashWithdrawal - d.cashExpense)}</strong></span>
+        </div>
+      `).join('');
+
+  page2.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+      ${renderSubPageHeader(L.dayWiseSummary)}
+
+      <!-- DAY-BY-DAY TABLE -->
+      <div>
+        <div style="font-size: 11.5px; font-weight: 800; color: #1E293B; text-transform: uppercase; border-bottom: 1.5px solid #E2E8F0; padding-bottom: 3px; margin-bottom: 4px;">
+          ${L.dayWiseSummary} (${dailyBreakdown.length} ${L.days})
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 10.5px;">
+          <thead>
+            <tr style="background-color: #1E293B; color: #FFFFFF;">
+              <th style="padding: 5px 6px; text-align: left;">${L.date}</th>
+              <th style="padding: 5px 6px; text-align: right;">${L.income}</th>
+              <th style="padding: 5px 6px; text-align: right;">${L.expense}</th>
+              <th style="padding: 5px 6px; text-align: right;">${L.atmWithdrawal}</th>
+              <th style="padding: 5px 6px; text-align: right;">${L.net}</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${daySummaryRowsHtml}
+          </tbody>
+          <tfoot>
+            <tr style="background-color: #F1F5F9; font-weight: 800; color: #0F172A; border-top: 2px solid #CBD5E1;">
+              <td style="padding: 5px 6px;">Total (${dailyBreakdown.length} Days)</td>
+              <td style="padding: 5px 6px; text-align: right; color: #15803D;">+${formatCurrency(totalIncome)}</td>
+              <td style="padding: 5px 6px; text-align: right; color: #DC2626;">-${formatCurrency(totalExpense)}</td>
+              <td style="padding: 5px 6px; text-align: right; color: #4338CA;">+${formatCurrency(cashWithdrawal)}</td>
+              <td style="padding: 5px 6px; text-align: right; color: ${netSavings >= 0 ? '#15803D' : '#DC2626'};">${netSavings >= 0 ? '+' : '-'}${formatCurrency(netSavings)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- DAILY CASH MOVEMENT SUMMARY -->
+      <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 12px; margin-top: 4px;">
+        <div style="font-size: 11px; font-weight: 800; color: #1E293B; margin-bottom: 4px; text-transform: uppercase;">${L.dailyCashMovement}</div>
+        <div style="display: flex; flex-direction: column; gap: 2px;">
+          ${cashMovementRowsHtml}
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div style="text-align: center; font-size: 9px; color: #94A3B8; border-top: 1px solid #E2E8F0; padding-top: 6px;">
+      ${L.generatedBy} • ${new Date().toLocaleString(isTamil ? 'ta-IN' : 'en-IN')}
+    </div>
+  `;
+
+  pagesCanvases.push(await renderElementToCanvas(page2));
+
+  // =========================================================================
+  // PAGE 3+: DETAILED TRANSACTIONS BREAKDOWN
+  // =========================================================================
+  const renderTxCard = (tx, type) => {
+    const isPos = type === 'INCOME' || type === 'WITHDRAWAL';
+    const amtColor = type === 'INCOME' ? '#16A34A' : (type === 'EXPENSE' ? '#DC2626' : '#4338CA');
+    const amtSign = type === 'INCOME' ? '+₹' : (type === 'EXPENSE' ? '-₹' : '+₹');
+    const methodBadge = tx.paymentMethod === 'CASH'
+      ? '<span style="background: #DCFCE7; color: #15803D; padding: 1px 5px; border-radius: 4px; font-weight: 800; font-size: 9.5px;">CASH</span>'
+      : `<span style="background: #EEF2FF; color: #4338CA; padding: 1px 5px; border-radius: 4px; font-weight: 800; font-size: 9.5px;">UPI • ${tx.accountName || 'Bank'}</span>`;
     
-    if (daysWithTxs.length > 0) {
-      // Chunk days into pages
-      const dayChunks = [];
-      let currentChunk = [];
-      let currentTxCount = 0;
+    const timeFormatted = formatTime(tx.createdAt || tx.date);
+    const dateFormatted = formatShortDate(tx.date, isTamil);
+    const title = (tx.transactionName && tx.transactionName.trim()) ? tx.transactionName.trim() : (type === 'WITHDRAWAL' ? 'Cash Withdrawal' : L.unnamedTx);
 
-      daysWithTxs.forEach(d => {
-        const count = d.transactions.length;
-        if (currentChunk.length > 0 && (currentTxCount + count > 10 || currentChunk.length >= 2)) {
-          dayChunks.push(currentChunk);
-          currentChunk = [];
-          currentTxCount = 0;
-        }
-        currentChunk.push(d);
-        currentTxCount += count;
-      });
-      if (currentChunk.length > 0) {
-        dayChunks.push(currentChunk);
-      }
-
-      for (let chunkIdx = 0; chunkIdx < dayChunks.length; chunkIdx++) {
-        const chunkDays = dayChunks[chunkIdx];
-        const detailPage = createPageContainer(chunkIdx + 2);
-
-        const daysContentHtml = chunkDays.map(d => {
-          const dFormatted = formatDateDisplay(d.date, isTamil);
-          const incomeList = d.transactions.filter(t => t.type === 'INCOME');
-          const expenseList = d.transactions.filter(t => t.type === 'EXPENSE');
-          const withdrawalList = d.transactions.filter(t => t.type === 'CASH_WITHDRAWAL');
-
-          const buildRows = (list, type) => {
-            if (list.length === 0) return '';
-            return list.map((tx, idx) => {
-              const timeStr = formatTime(tx.createdAt || tx.date);
-              const title = (tx.transactionName && tx.transactionName.trim()) ? tx.transactionName.trim() : (type === 'WITHDRAWAL' ? 'Cash Withdrawal' : 'Transaction');
-              const method = tx.paymentMethod === 'CASH' ? 'CASH' : 'UPI';
-              const account = tx.paymentMethod === 'CASH' ? '—' : (tx.accountName || 'Bank');
-              const isPos = type === 'INCOME' || type === 'WITHDRAWAL';
-              const amtColor = type === 'INCOME' ? '#16A34A' : (type === 'EXPENSE' ? '#DC2626' : '#4338CA');
-              const bg = idx % 2 === 0 ? '#FFFFFF' : '#F8FAFC';
-              return `
-                <tr style="background-color: ${bg}; border-bottom: 1px solid #F1F5F9;">
-                  <td style="padding: 3px 6px; font-size: 10.5px; color: #64748B; text-align: center; width: 55px;">${timeStr}</td>
-                  <td style="padding: 3px 6px; font-size: 11px; font-weight: 700; color: #1E293B;">${title}</td>
-                  <td style="padding: 3px 6px; font-size: 9.5px; font-weight: 800; text-align: center; width: 55px; color: ${tx.paymentMethod === 'CASH' ? '#15803D' : '#4338CA'};">${method}</td>
-                  <td style="padding: 3px 6px; font-size: 10.5px; color: #475569; width: 110px;">${account}</td>
-                  <td style="padding: 3px 6px; font-size: 11px; font-weight: 800; text-align: right; width: 80px; color: ${amtColor};">${formatSignedCurrency(tx.amount, isPos)}</td>
-                </tr>
-              `;
-            }).join('');
-          };
-
-          const withdrawalRows = withdrawalList.map((tx, idx) => {
-            const timeStr = formatTime(tx.createdAt || tx.date);
-            const title = (tx.transactionName && tx.transactionName.trim()) ? tx.transactionName.trim() : 'Cash Withdrawal';
-            const route = `${tx.accountName || 'Bank'} → CASH`;
-            return `
-              <tr style="background-color: #EEF2FF; border-bottom: 1px solid #E0E7FF;">
-                <td style="padding: 3px 6px; font-size: 10.5px; color: #4338CA; text-align: center; width: 55px;">${timeStr}</td>
-                <td style="padding: 3px 6px; font-size: 11px; font-weight: 700; color: #312E81;">${title}</td>
-                <td style="padding: 3px 6px; font-size: 9.5px; font-weight: 800; text-align: center; width: 55px; color: #4338CA;">TRANSFER</td>
-                <td style="padding: 3px 6px; font-size: 10.5px; font-weight: 700; color: #4338CA; width: 110px;">${route}</td>
-                <td style="padding: 3px 6px; font-size: 11px; font-weight: 800; text-align: right; width: 80px; color: #4338CA;">+${formatCurrency(tx.amount)}</td>
-              </tr>
-            `;
-          }).join('');
-
-          return `
-            <div style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background-color: #FFFFFF;">
-              <!-- Day Header -->
-              <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1.5px solid #F1F5F9; padding-bottom: 4px; margin-bottom: 4px;">
-                <div style="font-size: 12px; font-weight: 800; color: #0F172A;">${dFormatted}</div>
-                <div style="font-size: 11px; font-weight: 700; color: #475569;">
-                  Income: <strong style="color: #15803D;">+${formatCurrency(d.income)}</strong> &nbsp;|&nbsp; 
-                  Expense: <strong style="color: #DC2626;">-${formatCurrency(d.expense)}</strong> &nbsp;|&nbsp; 
-                  Net: <strong style="color: ${d.net >= 0 ? '#15803D' : '#DC2626'};">${d.net >= 0 ? '+' : '-'}${formatCurrency(d.net)}</strong>
-                </div>
-              </div>
-
-              <!-- Day Transactions Table -->
-              <table style="width: 100%; border-collapse: collapse;">
-                <tbody>
-                  ${buildRows(incomeList, 'INCOME')}
-                  ${buildRows(expenseList, 'EXPENSE')}
-                  ${withdrawalRows}
-                </tbody>
-              </table>
+    return `
+      <div style="border-bottom: 1px solid #F1F5F9; padding: 4px 2px; font-size: 11px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <div>
+            <div style="font-weight: 700; color: #0F172A; font-size: 11.5px;">${title}</div>
+            <div style="display: flex; gap: 6px; align-items: center; margin-top: 1px; color: #64748B; font-size: 10px;">
+              <span>${dateFormatted} • ${timeFormatted}</span>
+              <span>•</span>
+              ${methodBadge}
             </div>
-          `;
-        }).join('');
-
-        detailPage.innerHTML = `
-          <div style="display: flex; flex-direction: column; gap: 8px;">
-            <!-- Top Header -->
-            <div style="background-color: #1E293B; border-radius: 8px; padding: 8px 14px; display: flex; justify-content: space-between; align-items: center; color: #FFFFFF;">
-              <div style="font-size: 13px; font-weight: 800;">${L.dayWiseDetails}</div>
-              <div style="font-size: 11.5px; color: #CBD5E1;">${periodTitle}</div>
-            </div>
-
-            <!-- List of Days in this chunk -->
-            <div style="display: flex; flex-direction: column;">
-              ${daysContentHtml}
-            </div>
+            ${tx.description ? `<div style="color: #475569; font-size: 9.5px; margin-top: 1px; font-style: italic;">${L.description} ${tx.description}</div>` : ''}
           </div>
-
-          <!-- Bottom Page Footer -->
-          <div style="text-align: center; font-size: 9.5px; color: #94A3B8; border-top: 1px solid #E2E8F0; padding-top: 6px;">
-            ${L.generatedBy} • ${new Date().toLocaleString(isTamil ? 'ta-IN' : 'en-IN')}
+          <div style="font-weight: 800; font-size: 12.5px; color: ${amtColor}; text-align: right;">
+            ${amtSign}${Math.abs(tx.amount || 0).toLocaleString('en-IN')}
           </div>
-        `;
+        </div>
+      </div>
+    `;
+  };
 
-        pagesCanvases.push(await renderElementToCanvas(detailPage));
-      }
+  // Group transactions for multi-page rendering
+  const allCategorizedTxs = [
+    ...incomeTxs.map(t => ({ ...t, section: 'INCOME' })),
+    ...expenseTxs.map(t => ({ ...t, section: 'EXPENSE' })),
+    ...withdrawalTxs.map(t => ({ ...t, section: 'WITHDRAWAL' }))
+  ];
+
+  if (allCategorizedTxs.length > 0) {
+    const ITEMS_PER_PAGE = 12;
+    for (let i = 0; i < allCategorizedTxs.length; i += ITEMS_PER_PAGE) {
+      const chunk = allCategorizedTxs.slice(i, i + ITEMS_PER_PAGE);
+      const txPage = createPageContainer();
+
+      const chunkHtml = chunk.map(tx => renderTxCard(tx, tx.section)).join('');
+
+      txPage.innerHTML = `
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          ${renderSubPageHeader(L.detailedTransactions)}
+          <div style="display: flex; flex-direction: column; gap: 2px;">
+            ${chunkHtml}
+          </div>
+        </div>
+
+        <!-- FOOTER -->
+        <div style="text-align: center; font-size: 9px; color: #94A3B8; border-top: 1px solid #E2E8F0; padding-top: 6px;">
+          ${L.generatedBy} • ${new Date().toLocaleString(isTamil ? 'ta-IN' : 'en-IN')}
+        </div>
+      `;
+
+      pagesCanvases.push(await renderElementToCanvas(txPage));
     }
   }
 
-  // Combine into multi-page jsPDF
+  // =========================================================================
+  // FINAL PAGE: CONSOLIDATED FINANCIAL SUMMARY & TOTAL MONEY
+  // =========================================================================
+  const finalPage = createPageContainer();
+
+  finalPage.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 14px;">
+      ${renderSubPageHeader(L.financialSummary)}
+
+      <!-- CONSOLIDATED SUMMARY BOXES -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <!-- Financial Summary -->
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; font-size: 11.5px;">
+          <div style="font-size: 12px; font-weight: 800; color: #1E293B; margin-bottom: 8px; text-transform: uppercase;">${L.financialSummary}</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #166534;">
+            <span>${L.totalIncome}:</span>
+            <strong style="font-size: 12.5px;">+${formatCurrency(totalIncome)}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #991B1B;">
+            <span>${L.totalExpense}:</span>
+            <strong style="font-size: 12.5px;">-${formatCurrency(totalExpense)}</strong>
+          </div>
+          <div style="border-top: 1.5px solid #CBD5E1; padding-top: 6px; display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; color: #1E293B;">
+            <span>${L.netChange}:</span>
+            <span style="color: ${netSavings >= 0 ? '#15803D' : '#DC2626'};">${netSavings >= 0 ? '+' : '-'}${formatCurrency(netSavings)}</span>
+          </div>
+        </div>
+
+        <!-- Cash Summary -->
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; font-size: 11.5px;">
+          <div style="font-size: 12px; font-weight: 800; color: #1E293B; margin-bottom: 8px; text-transform: uppercase;">${L.cashActivity}</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #166534;">
+            <span>+ ${L.cashIncome}:</span>
+            <strong style="font-size: 12px;">+${formatCurrency(cashIncome)}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #4338CA;">
+            <span>+ ${L.atmWithdrawal}:</span>
+            <strong style="font-size: 12px;">+${formatCurrency(cashWithdrawal)}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #991B1B;">
+            <span>- ${L.cashExpense}:</span>
+            <strong style="font-size: 12px;">-${formatCurrency(cashExpense)}</strong>
+          </div>
+          <div style="border-top: 1.5px solid #CBD5E1; padding-top: 6px; display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; color: #1E293B;">
+            <span>${L.closingCash}:</span>
+            <span style="color: #4338CA;">${formatCurrency(closingCash)}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- BANK / UPI SUMMARY & TRANSACTION SUMMARY -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+        <!-- Bank / UPI Summary -->
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; font-size: 11.5px;">
+          <div style="font-size: 12px; font-weight: 800; color: #1E293B; margin-bottom: 8px; text-transform: uppercase;">${L.upiActivity}</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #166534;">
+            <span>+ ${L.upiIncome}:</span>
+            <strong style="font-size: 12px;">+${formatCurrency(upiIncome)}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #991B1B;">
+            <span>- ${L.upiExpense}:</span>
+            <strong style="font-size: 12px;">-${formatCurrency(upiExpense)}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px; color: #4338CA;">
+            <span>- ${L.atmDebited}:</span>
+            <strong style="font-size: 12px;">-${formatCurrency(cashWithdrawal)}</strong>
+          </div>
+          <div style="border-top: 1.5px solid #CBD5E1; padding-top: 6px; display: flex; justify-content: space-between; font-weight: 800; font-size: 13px; color: #1E293B;">
+            <span>Total Bank Balances:</span>
+            <span>${formatCurrency(totalBankBalance)}</span>
+          </div>
+        </div>
+
+        <!-- Transaction Counts Summary -->
+        <div style="background-color: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 8px; padding: 12px 14px; font-size: 11.5px;">
+          <div style="font-size: 12px; font-weight: 800; color: #1E293B; margin-bottom: 8px; text-transform: uppercase;">${L.statsSummary}</div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+            <span>${L.totalTxs}:</span>
+            <strong>${counts.totalTransactions || 0}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #166534;">
+            <span>${L.incomeTxs}:</span>
+            <strong>${counts.incomeCount || 0}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px; color: #991B1B;">
+            <span>${L.expenseTxs}:</span>
+            <strong>${counts.expenseCount || 0}</strong>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+            <span>${L.cashTxs} / ${L.upiTxs}:</span>
+            <strong>${counts.cashTxCount || 0} / ${counts.upiTxCount || 0}</strong>
+          </div>
+        </div>
+      </div>
+
+      <!-- FINAL TOTAL MONEY BOX -->
+      <div style="background-color: #1E293B; border-radius: 8px; padding: 14px 18px; color: #FFFFFF; display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+        <div>
+          <div style="font-size: 12px; font-weight: 800; color: #94A3B8; text-transform: uppercase;">FINAL POSITION</div>
+          <div style="font-size: 13px; color: #CBD5E1; margin-top: 2px;">
+            Cash: <strong style="color: #FFFFFF;">${formatCurrency(closingCash)}</strong> &nbsp;|&nbsp; 
+            Total Bank Balance: <strong style="color: #FFFFFF;">${formatCurrency(totalBankBalance)}</strong>
+          </div>
+        </div>
+        <div style="text-align: right;">
+          <div style="font-size: 12px; font-weight: 800; color: #94A3B8; text-transform: uppercase;">${L.totalMoney}</div>
+          <div style="font-size: 22px; font-weight: 900; color: #FFFFFF; margin-top: 2px;">${formatCurrency(totalMoney)}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FOOTER -->
+    <div style="text-align: center; font-size: 9.5px; color: #94A3B8; border-top: 1px solid #E2E8F0; padding-top: 8px;">
+      ${L.generatedBy} • ${new Date().toLocaleString(isTamil ? 'ta-IN' : 'en-IN')}
+    </div>
+  `;
+
+  pagesCanvases.push(await renderElementToCanvas(finalPage));
+
+  // =========================================================================
+  // COMPOSE ALL PAGES INTO JSPDF WITH ACCURATE PAGE NUMBERS (Page X of Y)
+  // =========================================================================
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -820,13 +1105,20 @@ export async function generateDateRangeFinancialReport({ fromDate, toDate, range
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const totalPages = pagesCanvases.length;
 
-  for (let i = 0; i < pagesCanvases.length; i++) {
+  for (let i = 0; i < totalPages; i++) {
     if (i > 0) doc.addPage();
     const imgData = pagesCanvases[i].toDataURL('image/jpeg', 0.95);
     doc.addImage(imgData, 'JPEG', 0, 0, pageWidth, pageHeight, undefined, 'FAST');
+
+    // Overlay Page X of Y on bottom right
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Page ${i + 1} of ${totalPages}`, pageWidth - 16, pageHeight - 5, { align: 'right' });
   }
 
   const filename = `Cashly_Range_Report_${fromDate}_to_${toDate}.pdf`;
-  return await saveOrSharePdf(doc, filename, `Cashly Statement (${fromDate} to ${toDate})`);
+  return await saveOrSharePdf(doc, filename, `Cashly Financial Report (${fromDate} to ${toDate})`);
 }
