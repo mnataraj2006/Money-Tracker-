@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Bell, Download, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
-import { summaryAPI } from '../services/api';
+import { summaryAPI, transactionsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { generateDateRangeFinancialReport } from '../utils/pdfGenerator';
 
@@ -34,8 +34,42 @@ export default function MonthlySummaryScreen({ month, onBack, user }) {
       setLoading(true);
       setError(null);
       setData(null);
-      const res = await summaryAPI.getMonthlySummary(targetMonth);
-      setData(res);
+      const [res, incomeTxRes] = await Promise.all([
+        summaryAPI.getMonthlySummary(targetMonth),
+        transactionsAPI.getAll({ month: targetMonth, type: 'INCOME', limit: 500 }).catch(() => ({ transactions: [] }))
+      ]);
+
+      let incomeBreakdown = res.incomeBreakdown || res.incomeCategoryBreakdown;
+      if ((!incomeBreakdown || incomeBreakdown.length === 0) && incomeTxRes?.transactions?.length > 0) {
+        const incomeMap = {};
+        const txs = incomeTxRes.transactions || [];
+        txs.forEach(tx => {
+          if (tx.type !== 'INCOME') return;
+          const label = (tx.transactionName && tx.transactionName.trim()) || (tx.name && tx.name.trim()) || (tx.category && tx.category.trim()) || 'Income';
+          const amt = Number(tx.amount) || 0;
+          if (amt > 0) {
+            incomeMap[label] = (incomeMap[label] || 0) + amt;
+          }
+        });
+
+        const totalInc = res.totalIncome || Object.values(incomeMap).reduce((a, b) => a + b, 0);
+
+        incomeBreakdown = Object.entries(incomeMap)
+          .map(([name, amount]) => ({
+            name,
+            category: name,
+            amount,
+            percentage: totalInc > 0 ? Math.round((amount / totalInc) * 100) : 0
+          }))
+          .sort((a, b) => b.amount - a.amount)
+          .slice(0, 10);
+      }
+
+      setData({
+        ...res,
+        incomeBreakdown: incomeBreakdown || [],
+        topIncomeItem: (incomeBreakdown && incomeBreakdown.length > 0) ? incomeBreakdown[0].name : 'None'
+      });
     } catch (err) {
       console.error('Failed to load monthly summary:', err);
       setError('Failed to load monthly summary. Please try again.');
@@ -114,6 +148,8 @@ export default function MonthlySummaryScreen({ month, onBack, user }) {
   const expensePercent = data?.expensePercent ?? 50;
   const topExpense = data?.topExpenseItem || data?.topExpenseCategory || 'None';
   const expensesList = data?.expenseBreakdown || data?.categoryBreakdown || [];
+  const topIncome = data?.topIncomeItem || data?.topIncomeCategory || (data?.incomeBreakdown?.[0]?.name) || 'None';
+  const incomesList = data?.incomeBreakdown || [];
 
   return (
     <div className="screen-container">
@@ -310,6 +346,58 @@ export default function MonthlySummaryScreen({ month, onBack, user }) {
                 </div>
               ) : (
                 expensesList.map((c, idx) => (
+                  <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: '600' }}>
+                      ● {c.name || c.category} ({c.percentage}%)
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>
+                      {formatCurrency(c.amount)}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Top Incomes Card */}
+          <div className="stitch-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center' }}>
+            <div style={{ width: '100%', fontSize: '14px', fontWeight: '800', color: 'var(--text-main)' }}>
+              Top Incomes
+            </div>
+
+            {/* Donut Summary Visual Circle */}
+            <div style={{
+              width: '160px',
+              height: '160px',
+              borderRadius: '50%',
+              border: incomesList.length === 0
+                ? '10px solid var(--border-color)'
+                : incomesList.length === 1
+                  ? '10px solid var(--green-income)'
+                  : '10px solid var(--bg-app)',
+              borderTopColor: incomesList.length > 1 ? 'var(--green-income)' : undefined,
+              borderRightColor: incomesList.length > 1 ? 'var(--navy-primary)' : undefined,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              textAlign: 'center',
+              padding: '12px'
+            }}>
+              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', fontWeight: '600' }}>Top Income</div>
+              <div style={{ fontSize: '16px', fontWeight: '800', color: incomesList.length > 0 ? 'var(--navy-primary)' : 'var(--text-muted)', wordBreak: 'break-word', maxWidth: '140px' }}>
+                {topIncome}
+              </div>
+            </div>
+
+            {/* Income Items List */}
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+              {incomesList.length === 0 ? (
+                <div style={{ textAlign: 'center', color: 'var(--text-muted)', fontSize: '13px', padding: '12px 0' }}>
+                  No income recorded for this month.
+                </div>
+              ) : (
+                incomesList.map((c, idx) => (
                   <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ fontSize: '13px', color: 'var(--text-main)', fontWeight: '600' }}>
                       ● {c.name || c.category} ({c.percentage}%)
