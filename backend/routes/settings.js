@@ -144,6 +144,7 @@ router.post('/restore', authenticateToken, async (req, res) => {
         n50: c.n50 || 0,
         n20: c.n20 || 0,
         n10: c.n10 || 0,
+        c10: c.c10 || 0,
         n5: c.n5 || 0,
         n2: c.n2 || 0,
         n1: c.n1 || 0,

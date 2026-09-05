@@ -118,6 +118,7 @@ const cashCountSchema = new mongoose.Schema({
   n50: { type: Number, default: 0 },
   n20: { type: Number, default: 0 },
   n10: { type: Number, default: 0 },
+  c10: { type: Number, default: 0 },
   n5: { type: Number, default: 0 },
   n2: { type: Number, default: 0 },
   n1: { type: Number, default: 0 },

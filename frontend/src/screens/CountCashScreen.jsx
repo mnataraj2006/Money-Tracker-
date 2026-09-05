@@ -16,6 +16,7 @@ export default function CountCashScreen({ onBack, onReconciliationSuccess, targe
     n50: '',
     n20: '',
     n10: '',
+    c10: '',
     n5: '',
     n2: '',
     n1: ''
@@ -46,6 +47,7 @@ export default function CountCashScreen({ onBack, onReconciliationSuccess, targe
             n50: res.counts.n50 ? String(res.counts.n50) : '',
             n20: res.counts.n20 ? String(res.counts.n20) : '',
             n10: res.counts.n10 ? String(res.counts.n10) : '',
+            c10: res.counts.c10 ? String(res.counts.c10) : '',
             n5: res.counts.n5 ? String(res.counts.n5) : '',
             n2: res.counts.n2 ? String(res.counts.n2) : '',
             n1: res.counts.n1 ? String(res.counts.n1) : ''
@@ -61,15 +63,16 @@ export default function CountCashScreen({ onBack, onReconciliationSuccess, targe
   };
 
   const denominations = [
-    { key: 'n500', value: 500, label: '₹ 500' },
-    { key: 'n200', value: 200, label: '₹ 200' },
-    { key: 'n100', value: 100, label: '₹ 100' },
-    { key: 'n50', value: 50, label: '₹ 50' },
-    { key: 'n20', value: 20, label: '₹ 20' },
-    { key: 'n10', value: 10, label: '₹ 10' },
-    { key: 'n5', value: 5, label: '₹ 5' },
-    { key: 'n2', value: 2, label: '₹ 2' },
-    { key: 'n1', value: 1, label: '₹ 1' }
+    { key: 'n500', value: 500, label: '₹500', type: 'note' },
+    { key: 'n200', value: 200, label: '₹200', type: 'note' },
+    { key: 'n100', value: 100, label: '₹100', type: 'note' },
+    { key: 'n50', value: 50, label: '₹50', type: 'note' },
+    { key: 'n20', value: 20, label: '₹20', type: 'note' },
+    { key: 'n10', value: 10, label: '₹10', type: 'note' },
+    { key: 'c10', value: 10, label: '₹10 (Coin)', type: 'coin' },
+    { key: 'n5', value: 5, label: '₹5 (Coin)', type: 'coin' },
+    { key: 'n2', value: 2, label: '₹2 (Coin)', type: 'coin' },
+    { key: 'n1', value: 1, label: '₹1 (Coin)', type: 'coin' }
   ];
 
   const handleQtyChange = (key, val) => {
@@ -109,6 +112,7 @@ export default function CountCashScreen({ onBack, onReconciliationSuccess, targe
         n50: parseInt(counts.n50, 10) || 0,
         n20: parseInt(counts.n20, 10) || 0,
         n10: parseInt(counts.n10, 10) || 0,
+        c10: parseInt(counts.c10, 10) || 0,
         n5: parseInt(counts.n5, 10) || 0,
         n2: parseInt(counts.n2, 10) || 0,
         n1: parseInt(counts.n1, 10) || 0
@@ -180,13 +184,13 @@ export default function CountCashScreen({ onBack, onReconciliationSuccess, targe
               key={denom.key}
               style={{
                 display: 'grid',
-                gridTemplateColumns: '70px 1fr 100px',
+                gridTemplateColumns: '95px 1fr 95px',
                 alignItems: 'center',
                 padding: '10px 0',
                 borderBottom: denom.key !== 'n1' ? '1px solid var(--border-color)' : 'none'
               }}
             >
-              <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--navy-primary)' }}>
+              <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--navy-primary)', whiteSpace: 'nowrap' }}>
                 {denom.label}
               </span>
 
@@ -215,7 +219,7 @@ export default function CountCashScreen({ onBack, onReconciliationSuccess, targe
                 />
               </div>
 
-              <span style={{ fontSize: '16px', fontWeight: '800', color: 'var(--text-main)', textAlign: 'right' }}>
+              <span style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-main)', textAlign: 'right', whiteSpace: 'nowrap' }}>
                 = ₹{subtotal.toLocaleString('en-IN')}
               </span>
             </div>

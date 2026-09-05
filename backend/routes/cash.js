@@ -99,7 +99,7 @@ async function recalculateDailyClosingsFrom(userId, startDate) {
 // SAVE DENOMINATION COUNT
 router.post('/count', authenticateToken, async (req, res) => {
   const userId = req.user.userId;
-  const { date, n500, n200, n100, n50, n20, n10, n5, n2, n1 } = req.body;
+  const { date, n500, n200, n100, n50, n20, n10, c10, n5, n2, n1 } = req.body;
 
   const targetDate = date || new Date().toISOString().split('T')[0];
 
@@ -109,11 +109,12 @@ router.post('/count', authenticateToken, async (req, res) => {
   const q50 = parseInt(n50) || 0;
   const q20 = parseInt(n20) || 0;
   const q10 = parseInt(n10) || 0;
+  const qc10 = parseInt(c10) || 0;
   const q5 = parseInt(n5) || 0;
   const q2 = parseInt(n2) || 0;
   const q1 = parseInt(n1) || 0;
 
-  const physicalCash = (q500 * 500) + (q200 * 200) + (q100 * 100) + (q50 * 50) + (q20 * 20) + (q10 * 10) + (q5 * 5) + (q2 * 2) + (q1 * 1);
+  const physicalCash = (q500 * 500) + (q200 * 200) + (q100 * 100) + (q50 * 50) + (q20 * 20) + (q10 * 10) + (qc10 * 10) + (q5 * 5) + (q2 * 2) + (q1 * 1);
 
   try {
     const cashData = await CashCalculationService.getExpectedCash(userId, targetDate);
@@ -135,6 +136,7 @@ router.post('/count', authenticateToken, async (req, res) => {
       n50: q50,
       n20: q20,
       n10: q10,
+      c10: qc10,
       n5: q5,
       n2: q2,
       n1: q1,
@@ -152,7 +154,7 @@ router.post('/count', authenticateToken, async (req, res) => {
         physicalCash,
         difference,
         status,
-        counts: { n500: q500, n200: q200, n100: q100, n50: q50, n20: q20, n10: q10, n5: q5, n2: q2, n1: q1 }
+        counts: { n500: q500, n200: q200, n100: q100, n50: q50, n20: q20, n10: q10, c10: qc10, n5: q5, n2: q2, n1: q1 }
       }
     });
   } catch (err) {
