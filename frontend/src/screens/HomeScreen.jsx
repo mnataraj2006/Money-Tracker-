@@ -498,8 +498,25 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                       style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F1F5F9', cursor: 'pointer' }}
                     >
                       <div style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B', wordBreak: 'break-word' }}>
-                          {tx.transactionName || tx.name || t('unnamedTransaction')}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: '700',
+                            color: '#1E293B',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {tx.transactionName || tx.name || t('unnamedTransaction')}
+                          </span>
+                          {Boolean(typeof tx.description === 'string' && tx.description.trim()) && (
+                            <FileText
+                              size={12}
+                              style={{ color: 'var(--text-secondary)', opacity: 0.85, flexShrink: 0 }}
+                              aria-label="Has description"
+                              title={tx.description.trim()}
+                            />
+                          )}
                         </div>
                         <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
                           {tx.createdAt ? new Date(tx.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : t('today')}
@@ -568,8 +585,25 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                       style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid #F1F5F9', cursor: 'pointer' }}
                     >
                       <div style={{ flex: 1, minWidth: 0, paddingRight: '12px' }}>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: '#1E293B', wordBreak: 'break-word' }}>
-                          {tx.transactionName || tx.name || t('unnamedTransaction')}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: '700',
+                            color: '#1E293B',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {tx.transactionName || tx.name || t('unnamedTransaction')}
+                          </span>
+                          {Boolean(typeof tx.description === 'string' && tx.description.trim()) && (
+                            <FileText
+                              size={12}
+                              style={{ color: 'var(--text-secondary)', opacity: 0.85, flexShrink: 0 }}
+                              aria-label="Has description"
+                              title={tx.description.trim()}
+                            />
+                          )}
                         </div>
                         <div style={{ fontSize: '11px', color: '#64748B', marginTop: '2px' }}>
                           {tx.createdAt ? new Date(tx.createdAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : t('today')}
@@ -740,8 +774,25 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                       {getTransactionIcon(tx)}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)', wordBreak: 'break-word' }}>
-                        {tx.transactionName || tx.name || t('unnamedTransaction')}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{
+                          fontSize: '14px',
+                          fontWeight: '700',
+                          color: 'var(--text-main)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {tx.transactionName || tx.name || t('unnamedTransaction')}
+                        </span>
+                        {Boolean(typeof tx.description === 'string' && tx.description.trim()) && (
+                          <FileText
+                            size={12}
+                            style={{ color: 'var(--text-secondary)', opacity: 0.85, flexShrink: 0 }}
+                            aria-label="Has description"
+                            title={tx.description.trim()}
+                          />
+                        )}
                       </div>
                       <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
                         Today • {tx.paymentMethod}
