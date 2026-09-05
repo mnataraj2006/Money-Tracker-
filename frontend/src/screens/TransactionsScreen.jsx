@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard, Calendar, X, Filter, ArrowDownToLine } from 'lucide-react';
+import { Search, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard, Calendar, X, Filter, ArrowDownToLine, FileText } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -364,7 +364,7 @@ export default function TransactionsScreen({ onNavigate, user }) {
                       cursor: 'pointer'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1, marginRight: '8px' }}>
                       <div style={{
                         width: '40px',
                         height: '40px',
@@ -372,15 +372,39 @@ export default function TransactionsScreen({ onNavigate, user }) {
                         backgroundColor: tx.type === 'CASH_WITHDRAWAL' ? '#EEF2FF' : (tx.type === 'INCOME' ? 'var(--green-income-bg)' : 'var(--red-expense-bg)'),
                         display: 'flex',
                         alignItems: 'center',
-                        justifyContent: 'center'
+                        justifyContent: 'center',
+                        flexShrink: 0
                       }}>
                         {getTransactionIcon(tx)}
                       </div>
-                      <div>
-                        <div style={{ fontSize: '14px', fontWeight: '700', color: 'var(--text-main)' }}>
-                          {tx.transactionName || tx.name || (tx.type === 'CASH_WITHDRAWAL' ? (t('cashWithdrawal') || 'Cash Withdrawal') : t('unnamedTransaction'))}
+                      <div style={{ minWidth: 0, flex: 1 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{
+                            fontSize: '14px',
+                            fontWeight: '700',
+                            color: 'var(--text-main)',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {tx.transactionName || tx.name || (tx.type === 'CASH_WITHDRAWAL' ? (t('cashWithdrawal') || 'Cash Withdrawal') : t('unnamedTransaction'))}
+                          </span>
+                          {Boolean(typeof tx.description === 'string' && tx.description.trim()) && (
+                            <FileText
+                              size={12}
+                              style={{ color: 'var(--text-secondary)', opacity: 0.85, flexShrink: 0 }}
+                              aria-label="Has description"
+                              title={tx.description.trim()}
+                            />
+                          )}
                         </div>
-                        <div style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+                        <div style={{
+                          fontSize: '11px',
+                          color: 'var(--text-secondary)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
                           {dateStr} • {tx.type === 'CASH_WITHDRAWAL' ? (t('cashWithdrawal') || 'Cash Withdrawal') : tx.paymentMethod}{tx.description ? ` • ${tx.description}` : ''}
                         </div>
                       </div>
@@ -389,7 +413,9 @@ export default function TransactionsScreen({ onNavigate, user }) {
                     <div style={{
                       fontSize: '15px',
                       fontWeight: '800',
-                      color: tx.type === 'CASH_WITHDRAWAL' ? '#4338CA' : (tx.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)')
+                      color: tx.type === 'CASH_WITHDRAWAL' ? '#4338CA' : (tx.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)'),
+                      flexShrink: 0,
+                      textAlign: 'right'
                     }}>
                       {tx.type === 'INCOME' ? '+' : '-'}{formatCurrency(tx.amount)}
                     </div>
