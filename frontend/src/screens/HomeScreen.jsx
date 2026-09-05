@@ -89,13 +89,6 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
     return `₹${num.toLocaleString('en-IN')}`;
   };
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return 'Good morning 👋';
-    if (hour >= 12 && hour < 17) return 'Good afternoon 👋';
-    return 'Good evening 👋';
-  };
-
   const getFormattedTodayDate = () => {
     const d = new Date();
     return d.toLocaleDateString(language === 'ta' ? 'ta-IN' : 'en-US', {
@@ -223,7 +216,7 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
           <h1 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>
-            {getGreeting()}
+            வாழ்க வளமுடன்🙏
           </h1>
           <div style={{ fontSize: '13px', color: 'var(--text-secondary)', fontWeight: '600' }}>
             {getFormattedTodayDate()}
