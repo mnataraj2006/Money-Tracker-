@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, Bell, Download, ChevronLeft, ChevronRight, AlertTriangle } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { ArrowLeft, Bell, Download, ChevronLeft, ChevronRight, AlertTriangle, Search, X } from 'lucide-react';
 import { summaryAPI, transactionsAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { generateDateRangeFinancialReport } from '../utils/pdfGenerator';
@@ -16,8 +16,25 @@ export default function MonthlySummaryScreen({ month, onBack, user }) {
 
   const [currentMonth, setCurrentMonth] = useState(() => month || getCurrentSystemMonth());
   const [data, setData] = useState(null);
+  const [monthTransactions, setMonthTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Transaction Lookup state
+  const [lookupSearch, setLookupSearch] = useState('');
+  const [selectedTx, setSelectedTx] = useState(null);
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const searchContainerRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target)) {
+        setIsSearchFocused(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   useEffect(() => {
     if (month) {
@@ -29,23 +46,32 @@ export default function MonthlySummaryScreen({ month, onBack, user }) {
     loadMonthlySummary(currentMonth);
   }, [currentMonth]);
 
+  const getTxName = (tx) => {
+    return (tx.transactionName && tx.transactionName.trim()) ||
+           (tx.name && tx.name.trim()) ||
+           (tx.description && tx.description.trim()) ||
+           'Unnamed Transaction';
+  };
+
   const loadMonthlySummary = async (targetMonth) => {
     try {
       setLoading(true);
       setError(null);
       setData(null);
-      const [res, incomeTxRes] = await Promise.all([
+      const [res, allTxsRes] = await Promise.all([
         summaryAPI.getMonthlySummary(targetMonth),
-        transactionsAPI.getAll({ month: targetMonth, type: 'INCOME', limit: 500 }).catch(() => ({ transactions: [] }))
+        transactionsAPI.getAll({ month: targetMonth, limit: 1000 }).catch(() => ({ transactions: [] }))
       ]);
 
+      const txs = allTxsRes?.transactions || [];
+      setMonthTransactions(txs);
+
       let incomeBreakdown = res.incomeBreakdown || res.incomeCategoryBreakdown;
-      if ((!incomeBreakdown || incomeBreakdown.length === 0) && incomeTxRes?.transactions?.length > 0) {
+      if ((!incomeBreakdown || incomeBreakdown.length === 0) && txs.length > 0) {
         const incomeMap = {};
-        const txs = incomeTxRes.transactions || [];
         txs.forEach(tx => {
           if (tx.type !== 'INCOME') return;
-          const label = (tx.transactionName && tx.transactionName.trim()) || (tx.name && tx.name.trim()) || (tx.category && tx.category.trim()) || 'Income';
+          const label = getTxName(tx);
           const amt = Number(tx.amount) || 0;
           if (amt > 0) {
             incomeMap[label] = (incomeMap[label] || 0) + amt;
@@ -77,6 +103,46 @@ export default function MonthlySummaryScreen({ month, onBack, user }) {
       setLoading(false);
     }
   };
+
+  // Extract unique (name, type) options from the current month's transactions
+  const availableTxOptions = useMemo(() => {
+    const map = new Map();
+    (monthTransactions || []).forEach(tx => {
+      const name = getTxName(tx);
+      const type = tx.type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+      const key = `${name.toLowerCase()}:::${type}`;
+      if (!map.has(key)) {
+        map.set(key, { name, type });
+      }
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [monthTransactions]);
+
+  // Filter options based on user search
+  const filteredOptions = useMemo(() => {
+    const q = lookupSearch.trim().toLowerCase();
+    if (!q) {
+      return availableTxOptions.slice(0, 8);
+    }
+    return availableTxOptions.filter(opt => opt.name.toLowerCase().includes(q));
+  }, [availableTxOptions, lookupSearch]);
+
+  // Calculate total and count for the selected transaction in the current month
+  const lookupResult = useMemo(() => {
+    if (!selectedTx) return null;
+    const matching = (monthTransactions || []).filter(tx => {
+      const isSameType = (selectedTx.type === 'INCOME' ? tx.type === 'INCOME' : tx.type === 'EXPENSE');
+      return isSameType && getTxName(tx).toLowerCase() === selectedTx.name.toLowerCase();
+    });
+    const totalAmount = matching.reduce((sum, tx) => sum + (Number(tx.amount) || 0), 0);
+    const count = matching.length;
+    return {
+      name: selectedTx.name,
+      type: selectedTx.type,
+      totalAmount,
+      count
+    };
+  }, [selectedTx, monthTransactions]);
 
   const systemMonth = getCurrentSystemMonth();
   const isNextDisabled = currentMonth >= systemMonth;
@@ -239,6 +305,196 @@ export default function MonthlySummaryScreen({ month, onBack, user }) {
         </div>
       ) : (
         <>
+          {/* Transaction Lookup Card */}
+          <div className="stitch-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '14px', fontWeight: '800', color: 'var(--navy-primary)' }}>
+                  Transaction Lookup
+                </div>
+                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                  Search or select a transaction
+                </div>
+              </div>
+              {selectedTx && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedTx(null);
+                    setLookupSearch('');
+                  }}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-muted)',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    padding: '4px 6px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <X size={14} /> Clear
+                </button>
+              )}
+            </div>
+
+            {/* Search Input Container */}
+            <div ref={searchContainerRef} style={{ position: 'relative', width: '100%' }}>
+              <div className="input-field-wrapper">
+                <Search className="input-icon-prefix" size={18} />
+                <input
+                  type="text"
+                  className="input-control has-prefix"
+                  placeholder="Search transaction..."
+                  value={lookupSearch}
+                  onFocus={() => setIsSearchFocused(true)}
+                  onChange={(e) => {
+                    setLookupSearch(e.target.value);
+                    setIsSearchFocused(true);
+                  }}
+                  style={{ height: '42px', fontSize: '13px' }}
+                />
+                {lookupSearch && (
+                  <X
+                    className="input-icon-suffix"
+                    size={16}
+                    onClick={() => {
+                      setLookupSearch('');
+                      setSelectedTx(null);
+                    }}
+                  />
+                )}
+              </div>
+
+              {/* Dropdown Suggestions */}
+              {isSearchFocused && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '46px',
+                    left: 0,
+                    right: 0,
+                    backgroundColor: 'var(--bg-card, #FFFFFF)',
+                    border: '1px solid var(--border-color)',
+                    borderRadius: 'var(--radius-md, 12px)',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+                    maxHeight: '220px',
+                    overflowY: 'auto',
+                    zIndex: 100
+                  }}
+                >
+                  {filteredOptions.length === 0 ? (
+                    <div style={{ padding: '12px 14px', fontSize: '13px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                      {availableTxOptions.length === 0 ? 'No transactions in this month' : 'No matching transaction names'}
+                    </div>
+                  ) : (
+                    filteredOptions.map((opt) => (
+                      <div
+                        key={`${opt.name}-${opt.type}`}
+                        onMouseDown={() => {
+                          setSelectedTx(opt);
+                          setLookupSearch(opt.name);
+                          setIsSearchFocused(false);
+                        }}
+                        style={{
+                          padding: '10px 14px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          borderBottom: '1px solid var(--border-color)',
+                          fontSize: '13px'
+                        }}
+                      >
+                        <span style={{ fontWeight: '600', color: 'var(--text-main)', wordBreak: 'break-word' }}>
+                          {opt.name}
+                        </span>
+                        <span style={{
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          padding: '2px 8px',
+                          borderRadius: '6px',
+                          backgroundColor: opt.type === 'INCOME' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                          color: opt.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)',
+                          flexShrink: 0,
+                          marginLeft: '8px'
+                        }}>
+                          {opt.type === 'INCOME' ? 'Income' : 'Expense'}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Result Area */}
+            {lookupResult ? (
+              <div style={{
+                padding: '14px 16px',
+                backgroundColor: 'var(--bg-app, #F8FAFC)',
+                borderRadius: 'var(--radius-md, 12px)',
+                border: '1px solid var(--border-color)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{
+                      fontSize: '15px',
+                      fontWeight: '800',
+                      color: 'var(--navy-primary)',
+                      wordBreak: 'break-word'
+                    }}>
+                      {lookupResult.name}
+                    </div>
+                    <div style={{
+                      display: 'inline-block',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      marginTop: '4px',
+                      backgroundColor: lookupResult.type === 'INCOME' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                      color: lookupResult.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)'
+                    }}>
+                      {lookupResult.type === 'INCOME' ? 'Income' : 'Expense'}
+                    </div>
+                  </div>
+
+                  {lookupResult.count > 0 ? (
+                    <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                      <div style={{
+                        fontSize: '22px',
+                        fontWeight: '800',
+                        color: lookupResult.type === 'INCOME' ? 'var(--green-income)' : 'var(--red-expense)'
+                      }}>
+                        {formatCurrency(lookupResult.totalAmount)}
+                      </div>
+                      <div style={{ fontSize: '11px', fontWeight: '600', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                        {lookupResult.count} {lookupResult.count === 1 ? 'transaction' : 'transactions'}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+
+                {lookupResult.count === 0 && (
+                  <div style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic', paddingTop: '4px' }}>
+                    No transactions found for this month
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)', textAlign: 'center', padding: '6px 0' }}>
+                Search for a transaction to see its monthly total.
+              </div>
+            )}
+          </div>
+
           {/* Financial Overview Card */}
           <div className="stitch-card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
             <div style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)' }}>
