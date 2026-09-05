@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Mic, ArrowDown, ArrowUp, CheckCircle, AlertTriangle, ChevronRight, ShoppingBag, Coffee, Briefcase, Utensils, CreditCard, RotateCcw, Landmark, FileText } from 'lucide-react';
+import { Plus, Minus, Mic, ArrowDown, ArrowUp, CheckCircle, AlertTriangle, ChevronRight, ShoppingBag, Coffee, Briefcase, Utensils, CreditCard, RotateCcw, Landmark, FileText, Star } from 'lucide-react';
 import { summaryAPI } from '../services/api';
 import { useLanguage } from '../context/LanguageContext';
 import { useDataCache } from '../context/DataContext';
@@ -510,9 +510,11 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                             {tx.transactionName || tx.name || t('unnamedTransaction')}
                           </span>
                           {Boolean(typeof tx.description === 'string' && tx.description.trim()) && (
-                            <FileText
-                              size={12}
-                              style={{ color: 'var(--text-secondary)', opacity: 0.85, flexShrink: 0 }}
+                            <Star
+                              size={13}
+                              fill="#EAB308"
+                              color="#EAB308"
+                              style={{ flexShrink: 0 }}
                               aria-label="Has description"
                               title={tx.description.trim()}
                             />
@@ -597,9 +599,11 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                             {tx.transactionName || tx.name || t('unnamedTransaction')}
                           </span>
                           {Boolean(typeof tx.description === 'string' && tx.description.trim()) && (
-                            <FileText
-                              size={12}
-                              style={{ color: 'var(--text-secondary)', opacity: 0.85, flexShrink: 0 }}
+                            <Star
+                              size={13}
+                              fill="#EAB308"
+                              color="#EAB308"
+                              style={{ flexShrink: 0 }}
                               aria-label="Has description"
                               title={tx.description.trim()}
                             />
@@ -786,9 +790,11 @@ export default function HomeScreen({ user, onNavigate, viewMode = 'normal' }) {
                           {tx.transactionName || tx.name || t('unnamedTransaction')}
                         </span>
                         {Boolean(typeof tx.description === 'string' && tx.description.trim()) && (
-                          <FileText
-                            size={12}
-                            style={{ color: 'var(--text-secondary)', opacity: 0.85, flexShrink: 0 }}
+                          <Star
+                            size={13}
+                            fill="#EAB308"
+                            color="#EAB308"
+                            style={{ flexShrink: 0 }}
                             aria-label="Has description"
                             title={tx.description.trim()}
                           />

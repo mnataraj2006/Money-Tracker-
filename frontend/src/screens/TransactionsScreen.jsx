@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard, Calendar, X, Filter, ArrowDownToLine, FileText } from 'lucide-react';
+import { Search, ShoppingBag, Coffee, Utensils, Briefcase, CreditCard, Calendar, X, Filter, ArrowDownToLine, Star } from 'lucide-react';
 import { transactionsAPI } from '../services/api';
 import { useDataCache } from '../context/DataContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -390,9 +390,11 @@ export default function TransactionsScreen({ onNavigate, user }) {
                             {tx.transactionName || tx.name || (tx.type === 'CASH_WITHDRAWAL' ? (t('cashWithdrawal') || 'Cash Withdrawal') : t('unnamedTransaction'))}
                           </span>
                           {Boolean(typeof tx.description === 'string' && tx.description.trim()) && (
-                            <FileText
-                              size={12}
-                              style={{ color: 'var(--text-secondary)', opacity: 0.85, flexShrink: 0 }}
+                            <Star
+                              size={13}
+                              fill="#EAB308"
+                              color="#EAB308"
+                              style={{ flexShrink: 0 }}
                               aria-label="Has description"
                               title={tx.description.trim()}
                             />
